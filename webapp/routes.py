@@ -1,6 +1,7 @@
 import os
 import time
 import sqlite3
+import datetime
 from flask import Flask, render_template, request, jsonify
 from pathlib import Path
 from .tracker import ActivityTracker 
@@ -369,5 +370,59 @@ def create_app():
             print(f"Error getting summary: {e}")
             if 'conn' in locals() and conn: conn.close()
             return jsonify({'success': False, 'error': str(e)}), 500
+        
+        
+    # === NEW API ROUTE FOR ANALYTICS CHART ===
+    @app.route('/api/analytics/weekly_summary')
+    def api_analytics_weekly_summary():
+        try:
+            conn = sqlite3.connect(DB_FILE)
+            c = conn.cursor()
+            
+            # 1. Get today's date (in user's local timezone)
+            today = datetime.date.today()
+            seven_days_ago = today - datetime.timedelta(days=6)
+            
+            # 2. Generate date labels for the last 7 days
+            # Format: 'Nov 13'
+            labels = [(today - datetime.timedelta(days=i)).strftime('%b %d') for i in range(6, -1, -1)]
+            
+            # 3. Get the start timestamp for the query (7 days ago at midnight)
+            start_ts = int(datetime.datetime.combine(seven_days_ago, datetime.time.min).timestamp())
+
+            # 4. Query the DB
+            # We select the date of the session (local time) and sum the duration
+            c.execute('''
+                SELECT 
+                    DATE(start_ts, 'unixepoch', 'localtime') as session_date, 
+                    SUM(duration) as total_duration
+                FROM sessions
+                WHERE start_ts >= ? AND duration > 0
+                GROUP BY session_date
+                ORDER BY session_date ASC
+            ''', (start_ts,))
+            
+            rows = c.fetchall()
+            conn.close()
+
+            # 5. Process the data into a dictionary for easy lookup
+            session_data = {row[0]: (row[1] or 0) for row in rows}
+            
+            # 6. Build the final data array, matching dates from our query
+            data = []
+            for i in range(6, -1, -1):
+                date_key = (today - datetime.timedelta(days=i)).strftime('%Y-%m-%d')
+                # Add duration in HOURS for the chart
+                duration_hours = (session_data.get(date_key, 0)) / 3600.0
+                data.append(round(duration_hours, 2))
+                
+            return jsonify({'success': True, 'labels': labels, 'data': data})
+            
+        except Exception as e:
+            print(f"Error in weekly summary: {e}")
+            if 'conn' in locals() and conn: conn.close()
+            return jsonify({'success': False, 'error': str(e)}), 500
+
+    return app
 
     return app

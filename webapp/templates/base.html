@@ -8,58 +8,138 @@
   <link rel="stylesheet" href="/static/css/dark.css">
   
   <script src="https://cdn.jsdelivr.net/npm/feather-icons/dist/feather.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@3.9.1/dist/chart.min.js"></script>
 
   <style>
-    /* Add a style for the active nav link */
-    .nav-link.active {
-      background-color: #0f1724; /* card bg */
-      color: #38bdf8; /* cyan-400 */
+    /* These styles are more complex now.
+      We use a 'collapsed' class on the BODY tag to control the layout.
+    */
+    :root {
+      --sidebar-width: 250px;
+      --sidebar-width-collapsed: 80px;
+    }
+    
+    .sidebar {
+      width: var(--sidebar-width);
+      transition: width 0.3s ease, transform 0.3s ease;
+    }
+    .main-content {
+      margin-left: var(--sidebar-width);
+      transition: margin-left 0.3s ease;
+    }
+
+    /* Styles for the collapsed state */
+    body.collapsed .sidebar {
+      width: var(--sidebar-width-collapsed);
+    }
+    body.collapsed .main-content {
+      margin-left: var(--sidebar-width-collapsed);
+    }
+    
+    /* Mobile styles (unchanged) */
+    @media (max-width: 768px) {
+      .sidebar {
+        transform: translateX(-100%);
+        z-index: 50;
+      }
+      .sidebar.open {
+        transform: translateX(0);
+      }
+      .main-content {
+        margin-left: 0;
+      }
+      .mobile-menu-button {
+        display: block;
+      }
+      /* Hide desktop toggle on mobile */
+      .sidebar-toggle {
+        display: none;
+      }
+      /* Don't collapse on mobile, just hide */
+      body.collapsed .sidebar {
+        width: var(--sidebar-width);
+      }
+      body.collapsed .main-content {
+        margin-left: 0;
+      }
     }
   </style>
 </head>
-<body class="min-h-screen p-4 md:p-6">
+<body class="bg-gray-900 text-gray-200">
   
-  <div class="max-w-5xl mx-auto">
-    <nav class="card p-2 rounded-lg shadow-sm mb-6">
-      <div class="flex flex-col md:flex-row justify-between space-y-2 md:space-y-0 md:space-x-2">
-        
-        <a href="/" id="nav-dashboard" class="nav-link flex-1 px-4 py-3 rounded-md text-center font-medium muted hover:bg-gray-900 transition-colors">
-          <i data-feather="home" class="inline-block w-5 h-5 md:mr-2"></i>
-          <span class="hidden md:inline">Dashboard</span>
-        </a>
-        <a href="/timers" id="nav-timers" class="nav-link flex-1 px-4 py-3 rounded-md text-center font-medium muted hover:bg-gray-900 transition-colors">
-          <i data-feather="clock" class="inline-block w-5 h-5 md:mr-2"></i>
-          <span class="hidden md:inline">Timers</span>
-        </a>
-        <a href="/history" id="nav-history" class="nav-link flex-1 px-4 py-3 rounded-md text-center font-medium muted hover:bg-gray-900 transition-colors">
-          <i data-feather="archive" class="inline-block w-5 h-5 md:mr-2"></i>
-          <span class="hidden md:inline">Session History</span>
-        </a>
-        <a href="/analytics" id="nav-analytics" class="nav-link flex-1 px-4 py-3 rounded-md text-center font-medium muted hover:bg-gray-900 transition-colors">
-          <i data-feather="bar-chart-2" class="inline-block w-5 h-5 md:mr-2"></i>
-          <span class="hidden md:inline">Analytics</span>
-        </a>
-
-      </div>
+  <aside class="sidebar fixed top-0 left-0 h-screen bg-gray-800 p-6 flex flex-col shadow-lg overflow-x-hidden">
+    <div class="flex items-center justify-between mb-8">
+      <h1 class="sidebar-text text-2xl font-bold text-white whitespace-nowrap">🌙 StudyTrack</h1>
+    </div>
+    
+    <nav class="flex flex-col space-y-3">
+      <a href="/" id="nav-dashboard" class="nav-link flex items-center px-4 py-3 rounded-lg font-medium text-gray-300 hover:bg-gray-700 hover:text-white">
+        <i data-feather="home" class="w-5 h-5 flex-shrink-0"></i>
+        <span class="sidebar-text ml-3 whitespace-nowrap">Dashboard</span>
+      </a>
+      <a href="/timers" id="nav-timers" class="nav-link flex items-center px-4 py-3 rounded-lg font-medium text-gray-300 hover:bg-gray-700 hover:text-white">
+        <i data-feather="clock" class="w-5 h-5 flex-shrink-0"></i>
+        <span class="sidebar-text ml-3 whitespace-nowrap">Timers</span>
+      </a>
+      <a href="/history" id="nav-history" class="nav-link flex items-center px-4 py-3 rounded-lg font-medium text-gray-300 hover:bg-gray-700 hover:text-white">
+        <i data-feather="archive" class="w-5 h-5 flex-shrink-0"></i>
+        <span class="sidebar-text ml-3 whitespace-nowrap">Session History</span>
+      </a>
+      <a href="/analytics" id="nav-analytics" class="nav-link flex items-center px-4 py-3 rounded-lg font-medium text-gray-300 hover:bg-gray-700 hover:text-white">
+        <i data-feather="bar-chart-2" class="w-5 h-5 flex-shrink-0"></i>
+        <span class="sidebar-text ml-3 whitespace-nowrap">Analytics</span>
+      </a>
     </nav>
+    
+    <div class="mt-auto">
+      <button onclick="toggleSidebar()" class="sidebar-toggle nav-link flex items-center w-full px-4 py-3 rounded-lg font-medium text-gray-400 hover:bg-gray-700 hover:text-white">
+        <i data-feather="chevrons-left" class="w-5 h-5 flex-shrink-0 toggle-icon"></i>
+        <span class="sidebar-text ml-3 whitespace-nowrap">Collapse</span>
+      </button>
+    </div>
+  </aside>
+
+  <button id="menu-toggle" class="mobile-menu-button fixed top-4 left-4 p-2 bg-gray-800 rounded-md shadow-lg md:hidden z-50">
+    <i data-feather="menu" class="w-6 h-6 text-white"></i>
+  </button>
+  
+  <div class="main-content p-6 md:p-10">
     <main>
       {% block content %}{% endblock %}
     </main>
-
   </div>
 
   <script>
-    // Run Feather Icons
     feather.replace();
     
-    // --- Set the 'active' link in the nav ---
-    // This script will run on every page
     const pageId = "nav-{{ page_id or 'dashboard' }}";
     const activeLink = document.getElementById(pageId);
     if (activeLink) {
       activeLink.classList.add('active');
     }
-    // ----------------------------------------
+
+    // --- NEW: Sidebar Toggle Logic ---
+    function toggleSidebar() {
+      const isCollapsed = document.body.classList.toggle('collapsed');
+      // Save preference to local storage
+      localStorage.setItem('sidebarCollapsed', isCollapsed);
+      // Update icon direction
+      const icon = document.querySelector('.toggle-icon');
+      icon.setAttribute('data-feather', isCollapsed ? 'chevrons-right' : 'chevrons-left');
+      feather.replace(); // Re-render the icon
+    }
+    
+    // Check local storage on page load
+    if (localStorage.getItem('sidebarCollapsed') === 'true') {
+      toggleSidebar();
+    }
+
+    // --- Mobile Menu Toggle ---
+    const menuToggle = document.getElementById('menu-toggle');
+    const sidebar = document.querySelector('.sidebar');
+    menuToggle.addEventListener('click', () => {
+      sidebar.classList.toggle('open');
+    });
   </script>
 
 </body>

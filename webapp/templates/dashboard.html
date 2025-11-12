@@ -8,31 +8,60 @@
     <p class="muted">Welcome to your local StudyTrack.</p>
   </div>
 
-  <div class="card p-6 rounded-lg shadow-sm">
-    <h2 class="text-lg font-medium mb-3">Recent sessions</h2>
-    <div id="sessionsList" class="space-y-3 muted">Loading...</div>
+  <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 mb-6">
+    
+    <div class="card p-6 rounded-lg shadow-sm lg:col-span-2">
+      <h2 class="text-lg font-medium mb-3">Current Status</h2>
+      <div id="statusWidget">
+        <p class="muted">Loading status...</p>
+      </div>
+    </div>
+
+    <div class="card card-gradient-purple p-6 rounded-lg shadow-sm">
+      <h2 class="text-lg font-medium mb-3 text-white opacity-90">Today's Focus</h2>
+      <div class="text-4xl font-bold" id="stats-today">--:--:--</div>
+      <p class="text-white opacity-70 text-sm mt-4">Stats API coming soon...</p>
+    </div>
   </div>
 
+  <div class="grid grid-cols-1 gap-6 mb-6">
+    <div class="card p-6 rounded-lg shadow-sm">
+      <h2 class="text-lg font-medium mb-4">Weekly Focus (Hours)</h2>
+      <div class="h-64 md:h-80">
+        <canvas id="weeklyChart"></canvas>
+      </div>
+    </div>
+  </div>
+
+  <div class="grid grid-cols-1 gap-6">
+    <div class="card p-6 rounded-lg shadow-sm">
+      <h2 class="text-lg font-medium mb-3">Recent Sessions</h2>
+      <div id="sessionsList" class="space-y-3 muted max-h-80 overflow-y-auto">
+        Loading...
+      </div>
+    </div>
+  </div>
+
+
 <script>
-// --- THIS FUNCTION WAS MISSING (but is not the cause of the crash) ---
+// --- Helper Functions (Unchanged) ---
 function secToHHMMSS(s){
   let h = Math.floor(s/3600); s %= 3600;
   let m = Math.floor(s/60); let sec = s%60;
   return `${h}h ${String(m).padStart(2,'0')}m ${String(sec).padStart(2,'0')}s`;
 }
-
 function escapeHtml(unsafe){ 
   return unsafe.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#039;'); 
 }
 
+// --- Data Loading Functions ---
+
 async function refreshSessions(){ 
   const res = await fetch('/api/recent'); 
-  // Handle server errors (like the one we just saw)
   if (!res.ok) {
       document.getElementById('sessionsList').innerHTML = '<div class="text-red-400">Error: Could not load recent sessions.</div>';
       return;
   }
-  
   const data = await res.json(); 
   const el = document.getElementById('sessionsList'); 
   if (!data.sessions || data.sessions.length===0){ 
@@ -42,22 +71,152 @@ async function refreshSessions(){
   el.innerHTML=''; 
   data.sessions.forEach(s=>{ 
     const start = new Date(s.start_ts*1000); 
+    // Show 'Running' status if end_ts is 0
     const endTxt = s.end_ts ? (' — '+new Date(s.end_ts*1000).toLocaleString()) : ' — <b class="text-green-400">Running</b>';
-    const dur = s.end_ts ? s.duration : '-'; // s.duration is already formatted by the API
+    // If running, show 'In Progress' for duration
+    const dur = s.end_ts ? s.duration : '<b class="text-green-400">In Progress</b>';
     
     const node = document.createElement('a');
     node.href = `/session/${s.id}/summary`; 
-    node.className='block p-3 rounded bg-gray-900 border border-gray-800 hover:border-cyan-500 transition-colors'; 
+    node.className='block p-3 rounded bg-gray-900 border border-gray-700 hover:border-cyan-500 transition-colors'; 
     node.innerHTML='<div class="font-medium">'+escapeHtml(s.name)+'</div>'
       +'<div class="muted text-sm">'+escapeHtml(s.tags||'No tags')+' · '
       +start.toLocaleString()+endTxt+' · '+dur+'</div>'; 
-      
     el.appendChild(node); 
   }); 
 }
 
-// Load the sessions when the page opens
+let statusInterval = null;
+async function refreshStatus() {
+  try {
+    const res = await fetch('/api/status');
+    const data = await res.json();
+    const el = document.getElementById('statusWidget');
+    
+    if (data.running) {
+      let statusText = data.status === 'paused' 
+        ? '<span class="text-yellow-400 font-medium">Paused</span>'
+        : '<span class="text-green-400 font-medium">Running</span>';
+        
+      el.innerHTML = `
+        <div class="font-medium text-lg">${escapeHtml(data.session.name)}</div>
+        <div class="muted text-sm mb-3">${escapeHtml(data.session.tags || 'No tags')}</div>
+        <div class="font-mono text-3xl font-bold mb-3">${data.elapsed_str}</div>
+        <div class="flex items-center justify-between">
+          ${statusText}
+          <a href="/timers" class="px-3 py-1 rounded bg-cyan-600 hover:bg-cyan-500 text-sm font-medium">
+            Go to Timer &rarr;
+          </a>
+        </div>
+      `;
+      if (data.status === 'running' && !statusInterval) {
+        statusInterval = setInterval(refreshStatus, 1000);
+      } else if (data.status === 'paused' && statusInterval) {
+        clearInterval(statusInterval);
+        statusInterval = null;
+      }
+    } else {
+      if (statusInterval) clearInterval(statusInterval);
+      statusInterval = null;
+      el.innerHTML = `
+        <p class="muted mb-4">No session is currently running.</p>
+        <a href="/timers" class="px-4 py-2 rounded bg-green-600 hover:bg-green-500 font-medium">
+          Start a New Session
+        </a>
+      `;
+    }
+  } catch (err) {
+    document.getElementById('statusWidget').innerHTML = '<div class="text-red-400">Error loading status.</div>';
+  }
+}
+
+// --- NEW: Function to load chart ---
+async function loadAnalyticsChart() {
+  try {
+    const res = await fetch('/api/analytics/weekly_summary');
+    const data = await res.json();
+    
+    if (!data.success) { throw new Error('Failed to load chart data'); }
+
+    const ctx = document.getElementById('weeklyChart').getContext('2d');
+    
+    // Create gradient
+    const gradient = ctx.createLinearGradient(0, 0, 0, 300);
+    gradient.addColorStop(0, 'rgba(56, 189, 248, 0.5)'); // cyan-400 with 50% opacity
+    gradient.addColorStop(1, 'rgba(56, 189, 248, 0)');   // transparent
+
+    new Chart(ctx, {
+      type: 'line',
+      data: {
+        labels: data.labels,
+        datasets: [{
+          label: 'Focus Hours',
+          data: data.data,
+          backgroundColor: gradient,
+          borderColor: '#38bdf8', // cyan-400
+          borderWidth: 2,
+          pointBackgroundColor: '#fff',
+          pointBorderColor: '#38bdf8',
+          pointHoverRadius: 6,
+          pointRadius: 4,
+          tension: 0.3,
+          fill: true
+        }]
+      },
+      options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        scales: {
+          y: {
+            beginAtZero: true,
+            grid: {
+              color: '#374151' // gray-700
+            },
+            ticks: {
+              color: '#9ca3af' // gray-400
+            }
+          },
+          x: {
+            grid: {
+              display: false
+            },
+            ticks: {
+              color: '#9ca3af' // gray-400
+            }
+          }
+        },
+        plugins: {
+          legend: {
+            display: false
+          },
+          tooltip: {
+            backgroundColor: '#1f2937', // gray-800
+            titleFont: { size: 14 },
+            bodyFont: { size: 12 },
+            padding: 10,
+            caretSize: 6,
+            cornerRadius: 6,
+            callbacks: {
+              label: function(context) {
+                return ` ${context.parsed.y} hours`;
+              }
+            }
+          }
+        }
+      }
+    });
+
+  } catch (err) {
+    console.error(err);
+    document.getElementById('weeklyChart').parentElement.innerHTML = '<div class="text-red-400">Error: Could not load chart.</div>';
+  }
+}
+
+
+// --- Load all data on page start ---
 refreshSessions();
+refreshStatus();
+loadAnalyticsChart();
 
 </script>
 

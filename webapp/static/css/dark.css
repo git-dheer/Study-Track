@@ -1,5 +1,81 @@
-body { background: #0b1020; color: #e6eef8; }
-.card { background: #0f1724; border: 1px solid #1f2937; }
-.muted { color: #94a3b8; }
-input, button { outline: none; }
-code { background: rgba(255,255,255,0.03); padding: 2px 6px; border-radius: 4px; }
+/* Base styles */
+body { 
+  background: #111827; /* Darker bg (gray-900) */
+  color: #d1d5db; /* gray-300 */
+}
+
+.card { 
+  background: #1f2937; /* Lighter card bg (gray-800) */
+  border: 1px solid #374151; /* gray-700 */
+  border-radius: 12px;
+  box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+}
+
+.muted { 
+  color: #9ca3af; /* gray-400 */
+}
+
+input, button { 
+  outline: none; 
+}
+
+/* Style for the active nav link in the sidebar */
+.nav-link.active {
+  background-color: #38bdf8; /* cyan-400 */
+  color: #ffffff;
+  font-weight: 600;
+  box-shadow: 0 4px 10px rgba(56, 189, 248, 0.2);
+}
+
+/* ----- NEW: Collapsed Sidebar Styles ----- */
+body.collapsed .sidebar {
+  padding-left: 1.25rem; /* 20px */
+  padding-right: 1.25rem; /* 20px */
+}
+body.collapsed .sidebar .sidebar-text {
+  opacity: 0;
+  width: 0;
+  visibility: hidden;
+  transition: opacity 0.1s ease;
+}
+body.collapsed .sidebar .nav-link,
+body.collapsed .sidebar .sidebar-toggle {
+  justify-content: center; /* Center the icon */
+}
+body.collapsed .sidebar .nav-link span,
+body.collapsed .sidebar .sidebar-toggle span {
+  margin-left: 0;
+}
+body.collapsed .sidebar .sidebar-toggle .toggle-icon {
+  transform: rotate(180deg); /* Flips the 'chevrons-left' icon */
+}
+
+/* ----- Gradient Card Styles ----- */
+.card-gradient-purple {
+  background-image: linear-gradient(to right, #581c87, #9333ea);
+  color: white;
+  border: none;
+}
+.card-gradient-orange {
+  background-image: linear-gradient(to right, #c2410c, #f97316);
+  color: white;
+  border: none;
+}
+.card-gradient-green {
+  background-image: linear-gradient(to right, #15803d, #22c55e);
+  color: white;
+  border: none;
+}
+
+/* ----- Responsive Fixes ----- */
+.mobile-menu-button {
+  display: none;
+}
+@media (max-width: 768px) {
+  .mobile-menu-button {
+    display: block;
+  }
+  .main-content {
+    padding: 60px 1.5rem 1.5rem 1.5rem;
+  }
+}

@@ -6,7 +6,7 @@ Usage:
   studytrack.py --start      # start detached server
   studytrack.py --stop       # stop running server
   studytrack.py --status     # show running status
-  studytrack.py --runserver  # run server in foreground (internal)
+  studytrack.py --runserver  # internal: run server in foreground (used by --start)
 """
 
 import os
@@ -15,29 +15,29 @@ import argparse
 import sqlite3
 import signal
 import time
-import json
 from datetime import datetime
 from pathlib import Path
 from subprocess import Popen
 import atexit
 
-# Minimal external dependency: Flask
+# Flask import (ensure installed in venv)
 try:
-    from flask import Flask, request, jsonify, redirect, url_for, render_template_string
-except Exception as e:
-    print("Flask not installed. Run: pip install -r requirements.txt")
+    from flask import Flask, request, jsonify, render_template_string
+except Exception:
+    print("Flask not installed. Activate your venv and run: pip install -r requirements.txt")
     sys.exit(1)
 
 APP_NAME = "StudyTrack"
 PORT = 8080
-# app data directory
+
+# Data directory (~/.studytrack)
 DATA_DIR = Path.home() / ".studytrack"
 DATA_DIR.mkdir(parents=True, exist_ok=True)
 PID_FILE = DATA_DIR / "studytrack.pid"
 DB_FILE = DATA_DIR / "studytrack.db"
 LOG_FILE = DATA_DIR / "studytrack.log"
 
-# --- Simple SQLite wrapper ---
+# ----------------- SQLite helpers -----------------
 def init_db():
     conn = sqlite3.connect(DB_FILE)
     c = conn.cursor()
@@ -84,9 +84,9 @@ def get_last_running_session():
     c.execute("SELECT id, name, tags, start_ts FROM sessions WHERE end_ts=0 ORDER BY start_ts DESC LIMIT 1")
     row = c.fetchone()
     conn.close()
-    return row  # or None
+    return row
 
-# --- PID management & process control ---
+# ----------------- PID management -----------------
 def write_pid(pid):
     PID_FILE.write_text(str(pid))
 
@@ -115,13 +115,16 @@ def is_process_running(pid):
 
 def kill_process_group(pid):
     try:
-        # kill the process group
         os.killpg(os.getpgid(pid), signal.SIGTERM)
         return True
-    except Exception as e:
-        return False
+    except Exception:
+        try:
+            os.kill(pid, signal.SIGTERM)
+            return True
+        except Exception:
+            return False
 
-# --- Flask app (templates inline for single-file simplicity) ---
+# ----------------- Flask app & UI -----------------
 app = Flask(__name__)
 
 INDEX_HTML = """
@@ -136,6 +139,8 @@ INDEX_HTML = """
   body { background: #0b1020; color: #e6eef8; }
   .card { background: #0f1724; border: 1px solid #1f2937; }
   .muted { color: #94a3b8; }
+  input, button { outline: none; }
+  code { background: rgba(255,255,255,0.03); padding: 2px 6px; border-radius: 4px; }
 </style>
 </head>
 <body class="min-h-screen p-6">
@@ -162,7 +167,7 @@ INDEX_HTML = """
         <button id="stopBtn" class="px-4 py-2 rounded bg-red-600 hover:bg-red-500" onclick="stopSession()" disabled>Stop</button>
         <div id="timer" class="ml-4 font-mono text-lg">00:00:00</div>
       </div>
-      <p class="muted mt-3 text-sm">Tip: close the terminal after starting StudyTrack. Use <code>studytrack --stop</code> to stop the server.</p>
+      <p class="muted mt-3 text-sm">Tip: after starting StudyTrack, you can close the terminal. Use <code>studytrack --stop</code> to stop the server.</p>
     </form>
   </div>
 
@@ -295,7 +300,6 @@ getStatusAndInit();
 </html>
 """
 
-# --- Flask routes for API ---
 @app.route("/")
 def index():
     return render_template_string(INDEX_HTML, port=PORT)
@@ -307,11 +311,9 @@ def api_start():
     tags = data.get("tags","").strip()
     if not name:
         return jsonify({"success": False, "error":"no name"}), 400
-    # ensure db
     init_db()
     start_ts = int(time.time())
     sid = start_session_in_db(name, tags, start_ts)
-    # return session info
     return jsonify({"success": True, "session": {"id": sid, "name": name, "tags": tags, "start_ts": start_ts}})
 
 @app.route("/api/stop", methods=["POST"])
@@ -324,7 +326,6 @@ def api_stop():
     duration = stop_session_in_db(sid, end_ts)
     if duration is None:
         return jsonify({"success": False, "error":"session not found"}), 404
-    # return duration nicely formatted
     h = duration // 3600
     m = (duration % 3600) // 60
     s = duration % 60
@@ -333,7 +334,6 @@ def api_stop():
 
 @app.route("/api/status", methods=["GET"])
 def api_status():
-    # returns whether a session is running and elapsed seconds
     row = get_last_running_session()
     if not row:
         return jsonify({"running": False})
@@ -357,28 +357,22 @@ def api_recent():
         sessions.append({"id": r[0], "name": r[1], "tags": r[2], "start_ts": r[3], "end_ts": r[4], "duration": r[5]})
     return jsonify({"sessions": sessions})
 
-# --- Server run function ---
+# ----------------- Server run -----------------
 def run_flask():
-    # ensure db exists
     init_db()
-    # write a tiny log line
     with open(LOG_FILE, "a") as f:
         f.write(f"[{datetime.now().isoformat()}] Starting StudyTrack server on port {PORT}\n")
-    # run flask
+    # Bind to 127.0.0.1 for local-only access
     app.run(host="127.0.0.1", port=PORT, threaded=True)
 
-# --- CLI behavior: start/stop/status ---
+# ----------------- CLI -----------------
 def cli_start():
-    # if pid file exists and process running, warn
     pid = read_pid()
     if pid and is_process_running(pid):
         print(f"StudyTrack appears to be already running (pid {pid}).")
         return
-
-    # spawn detached process that runs this script with --runserver
     python = sys.executable
     cmd = [python, os.path.abspath(__file__), "--runserver"]
-    # detach with new process group
     try:
         p = Popen(cmd, stdout=open(LOG_FILE, "a"), stderr=open(LOG_FILE, "a"), preexec_fn=os.setsid, close_fds=True)
         write_pid(p.pid)
@@ -398,7 +392,6 @@ def cli_stop():
         return
     ok = kill_process_group(pid)
     if ok:
-        # give it a moment
         time.sleep(0.4)
         remove_pid()
         print("StudyTrack stopped.")
@@ -415,7 +408,6 @@ def cli_status():
     else:
         print("PID file exists but process not running. Remove pid file and try again.")
 
-# If script is launched with --runserver, run Flask in foreground
 def main():
     parser = argparse.ArgumentParser(description="StudyTrack CLI")
     parser.add_argument("--start", action="store_true", help="Start StudyTrack (detached)")
@@ -425,10 +417,8 @@ def main():
     args = parser.parse_args()
 
     if args.runserver:
-        # run flask server (foreground) - used by detached launcher
         run_flask()
         return
-
     if args.start:
         cli_start()
         return
@@ -439,7 +429,6 @@ def main():
         cli_status()
         return
 
-    # default: open web UI in browser if running, else show help
     print("StudyTrack - use --start to run server in background, --stop to stop it, --status to check.")
     sys.exit(0)
 

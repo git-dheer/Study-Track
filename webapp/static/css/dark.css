@@ -1,0 +1,5 @@
+body { background: #0b1020; color: #e6eef8; }
+.card { background: #0f1724; border: 1px solid #1f2937; }
+.muted { color: #94a3b8; }
+input, button { outline: none; }
+code { background: rgba(255,255,255,0.03); padding: 2px 6px; border-radius: 4px; }

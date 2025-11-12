@@ -1,0 +1,40 @@
+# Python
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+*.so
+
+# Virtual Environment
+venv/
+.env/
+.venv/
+
+# Logs
+*.log
+~/.studytrack/
+studytrack.log
+
+# SQLite Database
+*.db
+
+# OS / Editor junk
+.DS_Store
+Thumbs.db
+*.swp
+*.swo
+*.bak
+
+# Flask cache / instance
+instance/
+*.pid
+
+# IDE / Editor configs
+.vscode/
+.idea/
+*.code-workspace
+
+# pyinstaller / build outputs (if you build later)
+build/
+dist/
+*.spec

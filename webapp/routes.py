@@ -290,6 +290,36 @@ def create_app():
             'elapsed_str': sec_to_hhmmss(elapsed_focus_time)
         })
 
+
+    @app.route('/api/tags')
+    def api_get_tags():
+        try:
+            conn = sqlite3.connect(DB_FILE)
+            c = conn.cursor()
+            
+            # Select all non-empty tags
+            c.execute("SELECT tags FROM sessions WHERE tags IS NOT NULL AND tags != ''")
+            rows = c.fetchall()
+            conn.close()
+            
+            # Use a set to store only unique tags
+            unique_tags = set()
+            
+            for row in rows:
+                # Split tags by comma and add them to the set
+                tags_list = [tag.strip() for tag in row[0].split(',')]
+                unique_tags.update(tags_list)
+            
+            # Convert the set to a sorted list for a clean dropdown
+            sorted_tags = sorted(list(unique_tags))
+            
+            return jsonify({'success': True, 'tags': sorted_tags})
+        except Exception as e:
+            print(f"Error getting tags: {e}")
+            if 'conn' in locals() and conn: conn.close()
+            return jsonify({'success': False, 'error': str(e)}), 500
+
+
     @app.route('/api/recent')
     def api_recent():
         conn = sqlite3.connect(DB_FILE)

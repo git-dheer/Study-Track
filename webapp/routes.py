@@ -317,40 +317,76 @@ def create_app():
                 })
             # -------------------------------
 
-            # --- FIX #3: Access by index ---
+            # --- FIX #3: Smarter Python-based Grouping ---
             c.execute('''
-                SELECT timestamp, app_name, window_title
+                SELECT app_name, window_title
                 FROM activity_log WHERE session_id = ?
                 ORDER BY timestamp ASC
             ''', (session_id,))
             raw_logs = c.fetchall()
             conn.close() 
 
+            # This dictionary will hold the summed time
+            # The key will be (app_name, simplified_window_title)
+            # The value will be the sample_count
+            grouped_activity = {}
+
+            for log in raw_logs:
+                app_name = log[0]
+                window_title = log[1]
+
+                # --- Smart Title Cleaning ---
+                # This is the key part. We simplify titles.
+                
+                # 1. Clean browser titles (like the one in your screenshot)
+                # "00:52 - StudyTrack" becomes "StudyTrack"
+                # "01:00 - StudyTrack" becomes "StudyTrack"
+                if app_name.lower().startswith('brave') and ' - ' in window_title:
+                    try:
+                        # Split "00:52 - StudyTrack" and take the last part
+                        simplified_title = window_title.split(' - ')[-1].strip()
+                        # If the first part was a timer (e.g., "00:52"), this is a good simplification.
+                        # We check if the first part looks like a timer.
+                        first_part = window_title.split(' - ')[0]
+                        if ':' in first_part and any(char.isdigit() for char in first_part):
+                            window_title = simplified_title
+                        else:
+                            # If it's "Google - Gmail", we keep it as "Google - Gmail"
+                            pass
+                    except Exception:
+                        pass # Keep original title if splitting fails
+
+                # 2. Add more cleaning rules here if needed
+                # e.g., for VSCode: "file.py - MyProject" -> "MyProject"
+                
+                # --- Grouping ---
+                key = (app_name, window_title)
+                if key not in grouped_activity:
+                    grouped_activity[key] = 0
+                grouped_activity[key] += 1 # Add one sample (1 second)
+
+            # Convert the dictionary to a list
+            activity_blocks_raw = []
+            for (app, title), count in grouped_activity.items():
+                activity_blocks_raw.append({
+                    'app_name': app,
+                    'window_title': title,
+                    'sample_count': count
+                })
+
+            # Sort the list by time spent (highest first)
+            activity_blocks_sorted = sorted(activity_blocks_raw, key=lambda x: x['sample_count'], reverse=True)
+
+            # Format for the frontend
             activity_blocks = []
-            if raw_logs:
-                # 0=timestamp, 1=app_name, 2=window_title
-                current_block = {
-                    'app_name': raw_logs[0][1],
-                    'window_title': raw_logs[0][2],
-                    'start_time': raw_logs[0][0],
-                    'sample_count': 1
-                }
-                for log in raw_logs[1:]:
-                    if log[1] == current_block['app_name'] and log[2] == current_block['window_title']:
-                        current_block['sample_count'] += 1
-                    else:
-                        duration_sec = int(current_block['sample_count'] * LOG_INTERVAL_SECONDS)
-                        current_block['duration_str'] = sec_to_hhmmss(duration_sec)
-                        activity_blocks.append(current_block)
-                        current_block = {
-                            'app_name': log[1],
-                            'window_title': log[2],
-                            'start_time': log[0],
-                            'sample_count': 1
-                        }
-                duration_sec = int(current_block['sample_count'] * LOG_INTERVAL_SECONDS)
-                current_block['duration_str'] = sec_to_hhmmss(duration_sec)
-                activity_blocks.append(current_block)
+            for block in activity_blocks_sorted:
+                duration_sec = int(block['sample_count'] * LOG_INTERVAL_SECONDS)
+                if duration_sec > 0:
+                    activity_blocks.append({
+                        'app_name': block['app_name'],
+                        'window_title': block['window_title'],
+                        'duration_str': sec_to_hhmmss(duration_sec)
+                    })
             # -------------------------------
 
             return jsonify({
@@ -371,7 +407,7 @@ def create_app():
             if 'conn' in locals() and conn: conn.close()
             return jsonify({'success': False, 'error': str(e)}), 500
         
-        
+
     # === NEW API ROUTE FOR ANALYTICS CHART ===
     @app.route('/api/analytics/weekly_summary')
     def api_analytics_weekly_summary():

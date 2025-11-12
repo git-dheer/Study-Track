@@ -54,6 +54,41 @@ function escapeHtml(unsafe){
   return unsafe.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#039;'); 
 }
 
+
+async function deleteSession(sessionId, event) {
+  // Stop the click from navigating to the summary page
+  event.stopPropagation();
+  event.preventDefault();
+  
+  if (!confirm('Are you sure you want to permanently delete this session?')) {
+    return;
+  }
+  
+  try {
+    const res = await fetch('/api/session/delete', {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({session_id: sessionId})
+    });
+    const data = await res.json();
+    
+    if (data.success) {
+      // Find the element on the page and remove it
+      const elToRemove = document.getElementById(`session-card-${sessionId}`);
+      if (elToRemove) {
+        elToRemove.remove();
+      } else {
+        // Fallback: just refresh the whole list
+        refreshSessions();
+      }
+    } else {
+      alert('Failed to delete session: ' + data.error);
+    }
+  } catch (err) {
+    alert('An error occurred: ' + err);
+  }
+}
+
 // --- Data Loading Functions ---
 
 async function refreshSessions(){ 
@@ -76,13 +111,31 @@ async function refreshSessions(){
     // If running, show 'In Progress' for duration
     const dur = s.end_ts ? s.duration : '<b class="text-green-400">In Progress</b>';
     
-    const node = document.createElement('a');
-    node.href = `/session/${s.id}/summary`; 
-    node.className='block p-3 rounded bg-gray-900 border border-gray-700 hover:border-cyan-500 transition-colors'; 
-    node.innerHTML='<div class="font-medium">'+escapeHtml(s.name)+'</div>'
-      +'<div class="muted text-sm">'+escapeHtml(s.tags||'No tags')+' · '
-      +start.toLocaleString()+endTxt+' · '+dur+'</div>'; 
-    el.appendChild(node); 
+    // Create a container div instead of an 'a' tag
+    const node = document.createElement('div');
+    node.id = `session-card-${s.id}`; // Add an ID so we can remove it
+    node.className = 'flex justify-between items-center p-3 rounded bg-gray-900 border border-gray-800 hover:border-cyan-500 transition-colors group';
+    
+    // Create a clickable link for the main content
+    const link = document.createElement('a');
+    link.href = `/session/${s.id}/summary`;
+    link.className = 'flex-grow';
+    link.innerHTML = '<div class="font-medium">' + escapeHtml(s.name) + '</div>'
+      + '<div class="muted text-sm">' + escapeHtml(s.tags || 'No tags') + ' · '
+      + start.toLocaleString() + endTxt + ' · ' + dur + '</div>';
+    
+    // Create the delete button
+    const deleteBtn = document.createElement('button');
+    deleteBtn.className = 'px-2 py-1 rounded bg-red-800 hover:bg-red-700 text-red-200 opacity-0 group-hover:opacity-100 transition-opacity ml-4';
+    deleteBtn.innerHTML = '<i data-feather="trash-2" class="w-4 h-4"></i>';
+    deleteBtn.onclick = (e) => deleteSession(s.id, e);
+    
+    node.appendChild(link);
+    node.appendChild(deleteBtn);
+    el.appendChild(node);
+    
+    // We must re-run feather.replace() after adding new icons
+    feather.replace(); 
   }); 
 }
 

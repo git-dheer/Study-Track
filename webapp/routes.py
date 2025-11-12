@@ -171,6 +171,33 @@ def create_app():
         
         return jsonify({'success': True, 'status': 'running'})
 
+    @app.route('/api/session/delete', methods=['POST'])
+    def api_delete_session():
+        data = request.get_json() or {}
+        sid = data.get('session_id')
+        if not sid:
+            return jsonify({'success': False, 'error': 'no session_id'}), 400
+            
+        try:
+            conn = sqlite3.connect(DB_FILE)
+            c = conn.cursor()
+            
+            # Delete from all related tables first
+            c.execute("DELETE FROM activity_log WHERE session_id = ?", (sid,))
+            c.execute("DELETE FROM breaks WHERE session_id = ?", (sid,))
+            
+            # Finally, delete the main session entry
+            c.execute("DELETE FROM sessions WHERE id = ?", (sid,))
+            
+            conn.commit()
+            conn.close()
+            
+            return jsonify({'success': True, 'session_id': sid})
+        except Exception as e:
+            print(f"Error deleting session {sid}: {e}")
+            if 'conn' in locals() and conn: conn.close()
+            return jsonify({'success': False, 'error': str(e)}), 500
+
     @app.route('/api/stop', methods=['POST'])
     def api_stop():
         global CURRENT_TRACKER 

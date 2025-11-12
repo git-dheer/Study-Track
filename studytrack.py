@@ -114,10 +114,16 @@ def status():
 def runserver():
     # import local webapp package and start app
     # keep import here so venv activation is required earlier
-    from webapp.routes import create_app
-    app = create_app()
-    # app.run will block; we bind to 127.0.0.1
-    app.run(host='127.0.0.1', port=PORT, threaded=True)
+    try:
+        from webapp.routes import create_app
+        app = create_app()
+        # FORCE DEBUG MODE
+        app.run(host='127.0.0.1', port=PORT, threaded=True, debug=True)
+    except ImportError as e:
+        print(f"Error: Failed to import webapp. {e}")
+        print("Please ensure your venv is active and all files are saved.")
+    except Exception as e:
+        print(f"An error occurred: {e}")
 
 # Argparse
 def main():

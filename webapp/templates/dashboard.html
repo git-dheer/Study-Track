@@ -1,29 +1,11 @@
 {% extends 'base.html' %}
 {% block content %}
+  
+  <script> document.page_id = 'dashboard'; </script>
+
   <div class="mb-6">
-    <h1 class="text-3xl font-semibold">StudyTrack</h1>
-    <p class="muted">Local study timer — runs at <code>http://localhost:8080</code></p>
-  </div>
-
-  <div class="card p-6 rounded-lg shadow-sm mb-6">
-    <form id="sessionForm" onsubmit="return false;">
-      <div class="mb-4">
-        <label class="block text-sm mb-1">Session name</label>
-        <input id="sessionName" class="w-full p-2 rounded bg-gray-900 border border-gray-700" placeholder="E.g. Math practice" />
-      </div>
-
-      <div class="mb-4">
-        <label class="block text-sm mb-1">Tags (comma separated)</label>
-        <input id="tags" class="w-full p-2 rounded bg-gray-900 border border-gray-700" placeholder="study,projectX" />
-      </div>
-
-      <div class="flex items-center space-x-3">
-        <button id="startBtn" class="px-4 py-2 rounded bg-green-600 hover:bg-green-500" onclick="startSession()">Start</button>
-        <button id="stopBtn" class="px-4 py-2 rounded bg-red-600 hover:bg-red-500" onclick="stopSession()" disabled>Stop</button>
-        <div id="timer" class="ml-4 font-mono text-lg">00:00:00</div>
-      </div>
-      <p class="muted mt-3 text-sm">Tip: after starting StudyTrack, you can close the terminal. Use <code>studytrack --stop</code> to stop the server.</p>
-    </form>
+    <h1 class="text-3xl font-semibold">Dashboard</h1>
+    <p class="muted">Welcome to your local StudyTrack.</p>
   </div>
 
   <div class="card p-6 rounded-lg shadow-sm">
@@ -32,40 +14,51 @@
   </div>
 
 <script>
-let runningSession = null;
-let timerInterval = null;
-
+// --- THIS FUNCTION WAS MISSING (but is not the cause of the crash) ---
 function secToHHMMSS(s){
   let h = Math.floor(s/3600); s %= 3600;
   let m = Math.floor(s/60); let sec = s%60;
-  return String(h).padStart(2,'0')+':'+String(m).padStart(2,'0')+':'+String(sec).padStart(2,'0');
+  return `${h}h ${String(m).padStart(2,'0')}m ${String(sec).padStart(2,'0')}s`;
 }
 
-async function startSession(){
-  const name = document.getElementById('sessionName').value.trim();
-  const tags = document.getElementById('tags').value.trim();
-  if (!name){ alert('Please enter a session name.'); return; }
-  const res = await fetch('/api/start', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({name, tags}) });
-  const data = await res.json();
-  if (data.success){ runningSession = data.session; document.getElementById('startBtn').disabled=true; document.getElementById('stopBtn').disabled=false; startTimerClient(); refreshSessions(); } else { alert('Failed to start session'); }
+function escapeHtml(unsafe){ 
+  return unsafe.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#039;'); 
 }
 
-async function stopSession(){
-  if (!runningSession) return;
-  const res = await fetch('/api/stop', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({session_id: runningSession.id}) });
-  const data = await res.json();
-  if (data.success){ runningSession=null; document.getElementById('startBtn').disabled=false; document.getElementById('stopBtn').disabled=true; stopTimerClient(); refreshSessions(); alert('Session ended. Duration: '+data.duration_str); } else { alert('Failed to stop session'); }
+async function refreshSessions(){ 
+  const res = await fetch('/api/recent'); 
+  // Handle server errors (like the one we just saw)
+  if (!res.ok) {
+      document.getElementById('sessionsList').innerHTML = '<div class="text-red-400">Error: Could not load recent sessions.</div>';
+      return;
+  }
+  
+  const data = await res.json(); 
+  const el = document.getElementById('sessionsList'); 
+  if (!data.sessions || data.sessions.length===0){ 
+    el.innerHTML = '<div class="muted">No sessions yet.</div>'; 
+    return; 
+  } 
+  el.innerHTML=''; 
+  data.sessions.forEach(s=>{ 
+    const start = new Date(s.start_ts*1000); 
+    const endTxt = s.end_ts ? (' — '+new Date(s.end_ts*1000).toLocaleString()) : ' — <b class="text-green-400">Running</b>';
+    const dur = s.end_ts ? s.duration : '-'; // s.duration is already formatted by the API
+    
+    const node = document.createElement('a');
+    node.href = `/session/${s.id}/summary`; 
+    node.className='block p-3 rounded bg-gray-900 border border-gray-800 hover:border-cyan-500 transition-colors'; 
+    node.innerHTML='<div class="font-medium">'+escapeHtml(s.name)+'</div>'
+      +'<div class="muted text-sm">'+escapeHtml(s.tags||'No tags')+' · '
+      +start.toLocaleString()+endTxt+' · '+dur+'</div>'; 
+      
+    el.appendChild(node); 
+  }); 
 }
 
-function startTimerClient(){ stopTimerClient(); timerInterval = setInterval(async ()=>{ const res = await fetch('/api/status'); const data = await res.json(); if (data.running){ document.getElementById('timer').innerText = data.elapsed_str; } else { document.getElementById('timer').innerText = '00:00:00'; } }, 800); }
-function stopTimerClient(){ if (timerInterval) clearInterval(timerInterval); timerInterval=null; }
+// Load the sessions when the page opens
+refreshSessions();
 
-async function refreshSessions(){ const res = await fetch('/api/recent'); const data = await res.json(); const el = document.getElementById('sessionsList'); if (!data.sessions || data.sessions.length===0){ el.innerHTML = '<div class="muted">No sessions yet.</div>'; return; } el.innerHTML=''; data.sessions.forEach(s=>{ const start = new Date(s.start_ts*1000); const endTxt = s.end_ts ? (' — '+new Date(s.end_ts*1000).toLocaleString()) : ' — running'; const dur = s.duration ? secToHHMMSS(s.duration) : '-'; const node = document.createElement('div'); node.className='p-3 rounded bg-gray-900 border border-gray-800'; node.innerHTML='<div class="font-medium">'+escapeHtml(s.name)+'</div>'+'<div class="muted text-sm">'+escapeHtml(s.tags||'')+' · '+start.toLocaleString()+endTxt+' · '+dur+'</div>'; el.appendChild(node); }); }
-
-function escapeHtml(unsafe){ return unsafe.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#039;'); }
-
-async function init(){ const res = await fetch('/api/status'); const data = await res.json(); if (data.running){ runningSession = data.session; document.getElementById('startBtn').disabled=true; document.getElementById('stopBtn').disabled=false; startTimerClient(); } else { document.getElementById('startBtn').disabled=false; document.getElementById('stopBtn').disabled=true; } refreshSessions(); }
-
-init();
 </script>
+
 {% endblock %}

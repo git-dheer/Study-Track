@@ -1,0 +1,119 @@
+{% extends 'base.html' %}
+{% block content %}
+  
+  <div class="card p-6 rounded-lg shadow-sm mb-6">
+    <div class="flex justify-between items-center">
+      <div>
+        <h1 class="text-3xl font-semibold" id="session-name">Loading...</h1>
+        <p class="muted" id="session-tags"></p>
+      </div>
+      <a href="/" class="px-4 py-2 rounded bg-green-600 hover:bg-green-500">
+        &larr; Back to Dashboard
+      </a>
+    </div>
+  </div>
+
+  <div class="card p-6 rounded-lg shadow-sm mb-6">
+    <h2 class="text-lg font-medium mb-4">Session Summary</h2>
+    <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+      <div class="p-4 rounded bg-gray-900 border border-gray-800">
+        <div class="text-sm muted mb-1">Total Duration</div>
+        <div class="text-3xl font-bold" id="total-duration">00:00:00</div>
+      </div>
+      <div class="p-4 rounded bg-gray-900 border border-gray-800 col-span-2">
+        <div class="text-sm muted mb-1">Top Applications</div>
+        <div class="text-lg font-medium space-y-1" id="top-apps-list">
+          <p class="muted">Loading...</p>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="card p-6 rounded-lg shadow-sm">
+    <h2 class="text-lg font-medium mb-3">Activity Log (Grouped)</h2>
+    <div id="detailed-log-list" class="space-y-2 muted text-sm max-h-96 overflow-y-auto">
+      <p>Loading...</p>
+    </div>
+  </div>
+
+<script>
+  // This is the session_id passed from the Flask template
+  const SESSION_ID = {{ session_id }};
+
+  function escapeHtml(unsafe){ 
+    return unsafe.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#039;'); 
+  }
+
+  // Function to format a UNIX timestamp
+  function formatTimestamp(ts) {
+    return new Date(ts * 1000).toLocaleTimeString();
+  }
+
+  async function loadSummary() {
+    try {
+      const res = await fetch(`/api/session/${SESSION_ID}/summary`);
+      const data = await res.json();
+
+      if (!data.success) {
+        alert('Failed to load session data.');
+        return;
+      }
+
+      // 1. Populate Header (Unchanged)
+      document.getElementById('session-name').textContent = data.session.name;
+      document.getElementById('session-tags').textContent = data.session.tags;
+
+      // 2. Populate Summary Card (Unchanged)
+      document.getElementById('total-duration').textContent = data.session.duration_str;
+      const topAppsEl = document.getElementById('top-apps-list');
+      if (data.summary.top_apps.length > 0) {
+        topAppsEl.innerHTML = ''; 
+        data.summary.top_apps.forEach(app => {
+          const appEl = document.createElement('div');
+          appEl.className = 'flex justify-between items-center';
+          appEl.innerHTML = `
+            <span>${escapeHtml(app.name)}</span>
+            <span class="text-base font-bold text-cyan-300">${app.duration_str}</span>
+          `;
+          topAppsEl.appendChild(appEl);
+        });
+      } else {
+        topAppsEl.innerHTML = '<p class="muted">No application activity was recorded.</p>';
+      }
+
+      // --- 3. POPULATE DETAILED LOG (UPDATED) ---
+      const logEl = document.getElementById('detailed-log-list');
+      
+      // We now read from 'activity_blocks' instead of 'detailed_log'
+      if (data.activity_blocks && data.activity_blocks.length > 0) {
+        logEl.innerHTML = ''; // Clear loading
+        
+        data.activity_blocks.forEach(block => {
+          const logEntry = document.createElement('div');
+          logEntry.className = 'p-3 rounded bg-gray-900 border border-gray-800';
+          
+          // Display the start time, app, title, and the new duration
+          logEntry.innerHTML = `
+            <div class="flex justify-between items-center mb-1">
+                <span class="font-medium text-yellow-400">${escapeHtml(block.app_name)}</span>
+                <span class="text-sm font-bold text-cyan-300">${block.duration_str}</span>
+            </div>
+            <div class="text-gray-300 truncate">${escapeHtml(block.window_title)}</div>
+            <div class="text-xs text-cyan-500 opacity-70 mt-1">Started at: ${formatTimestamp(block.start_time)}</div>
+          `;
+          logEl.appendChild(logEntry);
+        });
+      } else {
+        logEl.innerHTML = '<p class="muted">No detailed logs found.</p>';
+      }
+
+    } catch (err) {
+      console.error(err);
+      alert('Error loading summary.');
+    }
+  }
+
+  // Load the data as soon as the page opens
+  loadSummary();
+</script>
+{% endblock %}

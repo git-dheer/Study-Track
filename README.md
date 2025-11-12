@@ -118,7 +118,9 @@ sudo chmod +x /usr/local/bin/studytrack
 ## 📊 Roadmap
 
 🔹 v2.0 — Application & website usage tracking
+
 🔹 v3.0 — Charts and visual analytics
+
 🔹 v4.0 — Focus goals, daily summaries, and productivity scores
 
 ---

@@ -1,7 +1,267 @@
 {% extends 'base.html' %}
 {% block content %}
   <script> document.page_id = 'analytics'; </script>
+  
+  <div class="flex flex-col md:flex-row justify-between md:items-center mb-6">
+    <h1 class="text-3xl font-semibold">Analytics Dashboard</h1>
+    
+    <div class="flex items-center space-x-2 mt-4 md:mt-0">
+      <select id="filter-tag" class="w-40 p-2 rounded bg-gray-800 border border-gray-700 text-sm">
+        <option value="all">All Tags</option>
+        </select>
+      
+      <select id="filter-date-range" class="w-40 p-2 rounded bg-gray-800 border border-gray-700 text-sm">
+        <option value="monthly">This Month</option>
+        <option value="weekly">This Week</option>
+        <option value="daily">Today</option>
+        <option value="yearly">This Year</option>
+        <option value="custom">Custom Range...</option>
+      </select>
+      
+      <div id="custom-date-pickers" class="hidden items-center space-x-2">
+        <input type="text" id="filter-start-date" class="w-32 p-2 rounded bg-gray-900 border border-gray-700 text-sm" placeholder="Start Date">
+        <input type="text" id="filter-end-date" class="w-32 p-2 rounded bg-gray-900 border border-gray-700 text-sm" placeholder="End Date">
+      </div>
+    </div>
+  </div>
+  
+  <h2 class="text-xl font-semibold mb-4">At a Glance</h2>
+  <div class="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
+    <div class="card p-6 rounded-lg shadow-sm card-gradient-purple">
+      <div class="text-sm font-medium text-white opacity-80 mb-1">Total Focus Time</div>
+      <div id="stat-total-time" class="text-4xl font-bold text-white">--:--:--</div>
+    </div>
+    <div class="card p-6 rounded-lg shadow-sm card-gradient-green">
+      <div class="text-sm font-medium text-white opacity-80 mb-1">Total Sessions</div>
+      <div id="stat-total-sessions" class="text-4xl font-bold text-white">0</div>
+    </div>
+    <div class="card p-6 rounded-lg shadow-sm card-gradient-orange">
+      <div class="text-sm font-medium text-white opacity-80 mb-1">Avg. Session Time</div>
+      <div id="stat-avg-time" class="text-4xl font-bold text-white">--:--:--</div>
+    </div>
+  </div>
 
-  <h1 class="text-3xl font-semibold">Analytics</h1>
-  <p class="muted">This page will soon contain charts and graphs of your productivity.</p>
+  <h2 class="text-xl font-semibold mb-4">Productivity Over Time (Filtered)</h2>
+  <div class="card p-6 rounded-lg shadow-sm mb-8">
+    <div class="h-80">
+      <canvas id="dailyTrendChart"></canvas>
+    </div>
+  </div>
+
+  <h2 class="text-xl font-semibold mb-4">Activity Analysis (Filtered)</h2>
+  <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+    <div class="card p-6 rounded-lg shadow-sm">
+      <h2 class="text-lg font-medium mb-4">Top Applications</h2>
+      <div class="h-96">
+        <canvas id="topAppsChart"></canvas>
+      </div>
+    </div>
+    <div class="card p-6 rounded-lg shadow-sm">
+      <h2 class="text-lg font-medium mb-4">Focus by Tag</h2>
+      <div class="h-96">
+        <canvas id="topTagsChart"></canvas>
+      </div>
+    </div>
+  </div>
+
+  <style>
+    .datepicker {
+      background-color: #1f2937 !important; /* gray-800 */
+      border-color: #374151 !important; /* gray-700 */
+    }
+    .datepicker-picker span, .datepicker-view span {
+      color: #d1d5db; /* gray-300 */
+    }
+    .datepicker-picker span:hover, .datepicker-view span:hover {
+      background-color: #374151; /* gray-700 */
+    }
+    .datepicker-picker span.focused, .datepicker-view span.focused {
+      background-color: #38bdf8 !important; /* cyan-400 */
+      color: #fff !important;
+    }
+    .datepicker-picker span.selected, .datepicker-view span.selected {
+      background-color: #38bdf8 !important;
+      color: #fff !important;
+    }
+  </style>
+
+<script>
+  // --- Chart.js Helpers (Unchanged) ---
+  const chartGridColor = '#374151';
+  const chartTickColor = '#9ca3af';
+  const chartTooltipBg = '#1f2937';
+  const chartTooltipDefaults = {
+    backgroundColor: chartTooltipBg,
+    titleFont: { size: 14 },
+    bodyFont: { size: 12 },
+    padding: 10,
+    caretSize: 6,
+    cornerRadius: 6
+  };
+  
+  // Store chart instances to destroy them before redrawing
+  let chartInstances = {};
+
+  // Function to destroy a chart if it exists
+  function destroyChart(id) {
+    if (chartInstances[id]) {
+      chartInstances[id].destroy();
+      delete chartInstances[id];
+    }
+  }
+
+  // Helper to create a Line Chart
+  function createLineChart(canvasId, labels, data) {
+    destroyChart(canvasId);
+    const ctx = document.getElementById(canvasId).getContext('2d');
+    const gradient = ctx.createLinearGradient(0, 0, 0, 300);
+    gradient.addColorStop(0, 'rgba(56, 189, 248, 0.5)');
+    gradient.addColorStop(1, 'rgba(56, 189, 248, 0)');
+    chartInstances[canvasId] = new Chart(ctx, {
+      type: 'line', data: { labels: labels, datasets: [{ label: 'Focus Hours', data: data, backgroundColor: gradient, borderColor: '#38bdf8', borderWidth: 2, pointBackgroundColor: '#fff', pointBorderColor: '#38bdf8', pointHoverRadius: 6, pointRadius: 4, tension: 0.3, fill: true }] },
+      options: { responsive: true, maintainAspectRatio: false, scales: { y: { beginAtZero: true, grid: { color: chartGridColor }, ticks: { color: chartTickColor } }, x: { grid: { display: false }, ticks: { color: chartTickColor } } }, plugins: { legend: { display: false }, tooltip: { ...chartTooltipDefaults, callbacks: { label: (c) => ` ${c.parsed.y} hours` } } } }
+    });
+  }
+  // Helper to create a Bar Chart
+  function createBarChart(canvasId, labels, data) {
+    destroyChart(canvasId);
+    const ctx = document.getElementById(canvasId).getContext('2d');
+    const gradient = ctx.createLinearGradient(0, 0, 0, 400);
+    gradient.addColorStop(0, 'rgba(139, 92, 246, 0.7)');
+    gradient.addColorStop(1, 'rgba(139, 92, 246, 0.1)');
+    chartInstances[canvasId] = new Chart(ctx, {
+      type: 'bar', data: { labels: labels, datasets: [{ label: 'Total Hours', data: data, backgroundColor: gradient, borderColor: '#8B5CF6', borderWidth: 2 }] },
+      options: { responsive: true, maintainAspectRatio: false, indexAxis: 'y', scales: { y: { grid: { display: false }, ticks: { color: chartTickColor } }, x: { grid: { color: chartGridColor }, ticks: { color: chartTickColor } } }, plugins: { legend: { display: false }, tooltip: { ...chartTooltipDefaults, callbacks: { label: (c) => ` ${c.parsed.x} hours` } } } }
+    });
+  }
+  // Helper to create a Pie Chart
+  function createPieChart(canvasId, labels, data) {
+    destroyChart(canvasId);
+    const ctx = document.getElementById(canvasId).getContext('2d');
+    const pieColors = ['#38bdf8', '#818cf8', '#c084fc', '#f472b6', '#fb923c', '#a3e635', '#22d3ee', '#f87171'];
+    chartInstances[canvasId] = new Chart(ctx, {
+      type: 'pie', data: { labels: labels, datasets: [{ label: 'Total Hours', data: data, backgroundColor: pieColors, borderColor: '#1f2937', borderWidth: 3 }] },
+      options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { position: 'right', labels: { color: chartTickColor } }, tooltip: { ...chartTooltipDefaults, callbacks: { label: (c) => ` ${c.label}: ${c.parsed} hours` } } } }
+    });
+  }
+  
+  // --- NEW: Main function to load all data ---
+  
+  const filterTag = document.getElementById('filter-tag');
+  const filterDateRange = document.getElementById('filter-date-range');
+  const customDatePickers = document.getElementById('custom-date-pickers');
+  const startDatePicker = document.getElementById('filter-start-date');
+  const endDatePicker = document.getElementById('filter-end-date');
+  
+  // Helper to format Date to YYYY-MM-DD
+  function formatDate(date) {
+    return date.toISOString().split('T')[0];
+  }
+
+  async function loadAnalytics() {
+    const tag = filterTag.value;
+    const rangeType = filterDateRange.value;
+    const startDate = startDatePicker.value;
+    const endDate = endDatePicker.value;
+
+    let queryParams = `?tag=${encodeURIComponent(tag)}&range_type=${encodeURIComponent(rangeType)}`;
+    
+    if (rangeType === 'custom') {
+      if (!startDate || !endDate) {
+        // Don't fetch if custom is selected but dates are empty
+        return; 
+      }
+      queryParams += `&start_date=${encodeURIComponent(startDate)}&end_date=${encodeURIComponent(endDate)}`;
+    }
+
+    try {
+      const res = await fetch(`/api/analytics/summary${queryParams}`);
+      const data = await res.json();
+      
+      if (!data.success) { throw new Error(data.error || 'Failed to load analytics data'); }
+
+      // Populate Overview stats
+      document.getElementById('stat-total-time').textContent = data.overview.total_time_str;
+      document.getElementById('stat-total-sessions').textContent = data.overview.total_sessions;
+      document.getElementById('stat-avg-time').textContent = data.overview.avg_time_str;
+
+      // Populate Daily Trend (This chart is NOT filtered by date, it's always last 30 days)
+      if (data.daily_trend && data.daily_trend.data.length > 0) {
+        createLineChart('dailyTrendChart', data.daily_trend.labels, data.daily_trend.data);
+      } else {
+        document.getElementById('dailyTrendChart').parentElement.innerHTML = '<p class="muted">No session data found for the last 30 days.</p>';
+      }
+
+      // Populate Top Apps chart
+      if (data.top_apps && data.top_apps.data.length > 0) {
+        createBarChart('topAppsChart', data.top_apps.labels, data.top_apps.data);
+      } else {
+        document.getElementById('topAppsChart').parentElement.innerHTML = '<p class="muted">No application data found for this period.</p>';
+      }
+      
+      // Populate Top Tags chart
+      if (data.top_tags && data.top_tags.data.length > 0) {
+        createPieChart('topTagsChart', data.top_tags.labels, data.top_tags.data);
+      } else {
+        document.getElementById('topTagsChart').parentElement.innerHTML = '<p class="muted">No tagged sessions found for this period.</p>';
+      }
+
+    } catch (err) {
+      console.error(err);
+      // Set error for filtered sections
+      document.getElementById('topAppsChart').parentElement.innerHTML = `<p class="text-red-400">Error loading chart: ${err.message}</p>`;
+      document.getElementById('topTagsChart').parentElement.innerHTML = `<p class="text-red-400">Error loading chart: ${err.message}</p>`;
+    }
+  }
+  
+  // --- NEW: Function to load tags for the filter ---
+  async function loadTags() {
+    try {
+      const res = await fetch('/api/tags');
+      const data = await res.json();
+      if (data.success && data.tags.length > 0) {
+        data.tags.forEach(tag => {
+          if (tag) {
+            const option = document.createElement('option');
+            option.value = tag;
+            option.textContent = tag;
+            filterTag.appendChild(option);
+          }
+        });
+      }
+    } catch (err) { console.error("Could not load tags:", err); }
+  }
+
+  // --- NEW: Initialize Date Pickers and Event Listeners ---
+  
+  // Initialize date pickers
+  const datepickerOptions = { format: 'yyyy-mm-dd', autohide: true };
+  const startPicker = new Datepicker(startDatePicker, datepickerOptions);
+  const endPicker = new Datepicker(endDatePicker, datepickerOptions);
+  
+  // Set default dates for custom
+  startDatePicker.value = formatDate(new Date(new Date().setDate(new Date().getDate() - 7))); // 7 days ago
+  endDatePicker.value = formatDate(new Date()); // Today
+  
+  // Event Listeners for filters
+  filterTag.addEventListener('change', loadAnalytics);
+  filterDateRange.addEventListener('change', () => {
+    // Show/hide custom date pickers
+    if (filterDateRange.value === 'custom') {
+      customDatePickers.classList.remove('hidden');
+    } else {
+      customDatePickers.classList.add('hidden');
+    }
+    loadAnalytics();
+  });
+  
+  // Add listeners for the date pickers to reload charts on change
+  startDatePicker.addEventListener('changeDate', loadAnalytics);
+  endDatePicker.addEventListener('changeDate', loadAnalytics);
+
+  // --- Load all data on page start ---
+  loadAnalytics();
+  loadTags();
+
+</script>
 {% endblock %}

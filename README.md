@@ -7,32 +7,32 @@
 ![Python](https://img.shields.io/badge/Python-3.10+-blue?logo=python)
 ![Flask](https://img.shields.io/badge/Flask-Backend-lightgrey?logo=flask)
 ![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)
-![Status](https://img.shields.io/badge/Version-v1.0-success)
+![Status](https://img.shields.io/badge/Version-2.0-success)
 ![Dark Mode](https://img.shields.io/badge/Theme-Dark%20Mode-black)
 
-> **StudyTrack** is a lightweight local web app designed for focus sessions, studying, and productivity tracking — built for Linux systems like **Omarchy**.  
-> It runs a minimal Flask server locally and opens as a web app in your browser.
+A lightweight, local-first time tracker and productivity dashboard.
+
+StudyTrack runs a minimal Flask server on your local machine (`http://localhost:8080`) to give you a private, web-based interface for tracking your study sessions, work, and projects. It features detailed activity tracking (for Hyprland users) and a full analytics dashboard.
 
 ---
 
 ## 🚀 Features
 
-✅ Start & stop study/work sessions  
-✅ Add **tags** (e.g., `study`, `work`, `project`)  
-✅ Real-time **timer display**  
-✅ Auto-saves sessions to local database  
-✅ **Dark, responsive UI** optimized for low-RAM systems  
-✅ Simple CLI interface — start, stop, and check status  
-
----
-
-## 🧩 Tech Stack
-
-- **Backend:** Flask (Python)
-- **Frontend:** HTML + TailwindCSS (dark mode)
-- **Database:** SQLite (local)
-- **Environment:** Linux (tested on Omarchy / Arch-based systems)
-- **Command Interface:** Bash wrapper for CLI control
+* **Modern UI:** A clean, dark-mode, and responsive dashboard.
+* **Multiple Timer Modes:**
+    * **Stopwatch:** A simple start/pause/stop timer for flexible sessions.
+    * **Pomodoro:** A fully functional Pomodoro timer that logs focus/break cycles as a single session.
+    * **Timer:** A countdown timer that automatically starts and stops a session when the time is up.
+* **Dynamic Dashboard:** See your "Today's Focus," your currently running session, and a 30-day productivity chart, all in one place.
+* **Session History:** A searchable and filterable list of all past sessions, with the ability to delete old entries.
+* **Detailed Analytics:**
+    * Filter your entire productivity history by date range (Daily, Weekly, Monthly, Custom) and by tag.
+    * **Overview Cards:** See total time, total sessions, and average session length for any period.
+    * **Productivity Chart:** A filterable line chart to see your focus trends over time.
+    * **Activity Analysis:** Pie charts and bar charts show your time distribution across different apps and tags.
+* **Smart Activity Tracking:**
+    * (For Hyprland) Uses `hyprctl` and `psutil` to log your active application and window title every second.
+    * **Smart Grouping:** The session summary intelligently groups activity, turning "00:52 - App" and "00:53 - App" into a single "App" entry.
 
 ---
 
@@ -40,7 +40,7 @@
 
 ```bash
 # 1. Clone the repo
-git clone https://github.com/git-dheer/Study-Track.git
+git clone [https://github.com/git-dheer/Study-Track.git](https://github.com/git-dheer/Study-Track.git)
 cd Study-Track
 
 # 2. Create & activate virtual environment
@@ -51,49 +51,34 @@ source venv/bin/activate
 pip install -r requirements.txt
 ````
 
----
+-----
 
 ## 🖥️ Usage
 
-### CLI Commands
+The app is controlled by the main `studytrack.py` script.
 
 ```bash
-# Start the local Flask server
-studytrack --start
+# Start the server in the background (recommended)
+python3 studytrack.py --start
 
-# Check status
-studytrack --status
+# Stop the background server
+python3 studytrack.py --stop
 
-# Stop the app
-studytrack --stop
+# Check the status
+python3 studytrack.py --status
+
+# --- OR ---
+
+# Run the server in the foreground (for debugging)
+python3 studytrack.py --runserver
 ```
 
-> ⚡ Once started, open your browser (or installed web app) at
-> **[http://localhost:8080](http://localhost:8080)**
+> ⚡ Once started, open your browser to
+> **[http://localhost:8080](https://www.google.com/search?q=http://localhost:8080)**
 
-You can now create sessions, assign tags, and view summaries directly in the web UI.
+-----
 
----
 
-## 📂 Project Structure
-
-```
-Study-Track/
-├── studytrack.py           # main CLI + Flask launcher
-├── requirements.txt
-├── .gitignore
-├── README.md
-├── webapp/
-│   ├── app.py              # Flask routes + APIs
-│   ├── static/
-│   │   └── styles.css
-│   └── templates/
-│       └── dashboard.html  # dark-mode UI
-└── data/
-    └── sessions.db         # local SQLite DB (auto-generated)
-```
-
----
 
 ## 🧰 Wrapper (Optional)
 
@@ -115,15 +100,6 @@ sudo chmod +x /usr/local/bin/studytrack
 
 ---
 
-## 📊 Roadmap
-
-🔹 v2.0 — Application & website usage tracking
-
-🔹 v3.0 — Charts and visual analytics
-
-🔹 v4.0 — Focus goals, daily summaries, and productivity scores
-
----
 
 ## 🤝 Contributing
 

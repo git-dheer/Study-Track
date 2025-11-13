@@ -8,62 +8,60 @@
     <p class="muted">Welcome to your local StudyTrack.</p>
   </div>
 
-  <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 mb-6">
-    
-    <div class="card p-6 rounded-lg shadow-sm lg:col-span-2">
-      <h2 class="text-lg font-medium mb-3">Current Status</h2>
-      <div id="statusWidget">
-        <p class="muted">Loading status...</p>
+  <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+
+    <div class="lg:col-span-2 space-y-6">
+      
+      <div class="card p-6 rounded-lg shadow-sm">
+        <h2 class="text-lg font-medium mb-3">Current Status</h2>
+        <div id="statusWidget">
+          <p class="muted">Loading status...</p>
+        </div>
       </div>
+
+      <div class="card p-6 rounded-lg shadow-sm">
+        <h2 class="text-lg font-medium mb-4">30-Day Focus (Hours)</h2>
+        <div class="h-80"> <canvas id="weeklyChart"></canvas>
+        </div>
+      </div>
+
     </div>
 
-    <div class="card card-gradient-purple p-6 rounded-lg shadow-sm">
-      <h2 class="text-lg font-medium mb-3 text-white opacity-90">Today's Focus</h2>
-      <div class="text-4xl font-bold" id="stats-today">--:--:--</div>
-      <p class="text-white opacity-70 text-sm mt-4">Stats API coming soon...</p>
+    <div class="lg:col-span-1 space-y-6">
+
+      <div class="card card-gradient-purple p-6 rounded-lg shadow-sm">
+        <h2 class="text-lg font-medium mb-3 text-white opacity-90">Today's Focus</h2>
+        <div class="text-4xl font-bold" id="stats-today">--:--:--</div>
+        <p id="stats-today-placeholder" class="text-white opacity-70 text-sm mt-4">Stats API coming soon...</p>
+      </div>
+
+      <div class="card p-6 rounded-lg shadow-sm">
+        <h2 class="text-lg font-medium mb-3">Recent Sessions</h2>
+        <div id="sessionsList" class="space-y-3 muted max-h-96 overflow-y-auto">
+          Loading...
+        </div>
+      </div>
+
     </div>
   </div>
-
-  <div class="grid grid-cols-1 gap-6 mb-6">
-    <div class="card p-6 rounded-lg shadow-sm">
-      <h2 class="text-lg font-medium mb-4">Weekly Focus (Hours)</h2>
-      <div class="h-64 md:h-80">
-        <canvas id="weeklyChart"></canvas>
-      </div>
-    </div>
-  </div>
-
-  <div class="grid grid-cols-1 gap-6">
-    <div class="card p-6 rounded-lg shadow-sm">
-      <h2 class="text-lg font-medium mb-3">Recent Sessions</h2>
-      <div id="sessionsList" class="space-y-3 muted max-h-80 overflow-y-auto">
-        Loading...
-      </div>
-    </div>
-  </div>
-
-
-<script>
-// --- Helper Functions (Unchanged) ---
+  <script>
+// --- 1. HELPER FUNCTIONS (DEFINED FIRST) ---
 function secToHHMMSS(s){
   let h = Math.floor(s/3600); s %= 3600;
   let m = Math.floor(s/60); let sec = s%60;
   return `${h}h ${String(m).padStart(2,'0')}m ${String(sec).padStart(2,'0')}s`;
 }
+
 function escapeHtml(unsafe){ 
   return unsafe.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#039;'); 
 }
 
-
 async function deleteSession(sessionId, event) {
-  // Stop the click from navigating to the summary page
   event.stopPropagation();
   event.preventDefault();
-  
   if (!confirm('Are you sure you want to permanently delete this session?')) {
     return;
   }
-  
   try {
     const res = await fetch('/api/session/delete', {
       method: 'POST',
@@ -71,16 +69,8 @@ async function deleteSession(sessionId, event) {
       body: JSON.stringify({session_id: sessionId})
     });
     const data = await res.json();
-    
     if (data.success) {
-      // Find the element on the page and remove it
-      const elToRemove = document.getElementById(`session-card-${sessionId}`);
-      if (elToRemove) {
-        elToRemove.remove();
-      } else {
-        // Fallback: just refresh the whole list
-        refreshSessions();
-      }
+      document.getElementById(`session-card-${sessionId}`).remove();
     } else {
       alert('Failed to delete session: ' + data.error);
     }
@@ -89,34 +79,33 @@ async function deleteSession(sessionId, event) {
   }
 }
 
-// --- Data Loading Functions ---
+// --- 2. WIDGET-LOADING FUNCTIONS ---
 
 async function refreshSessions(){ 
-  const res = await fetch('/api/recent'); 
+  const res = await fetch('/api/all_sessions'); 
   if (!res.ok) {
       document.getElementById('sessionsList').innerHTML = '<div class="text-red-400">Error: Could not load recent sessions.</div>';
       return;
   }
+  
   const data = await res.json(); 
   const el = document.getElementById('sessionsList'); 
   if (!data.sessions || data.sessions.length===0){ 
     el.innerHTML = '<div class="muted">No sessions yet.</div>'; 
     return; 
   } 
+  
   el.innerHTML=''; 
-  data.sessions.forEach(s=>{ 
+  
+  data.sessions.slice(0, 5).forEach(s=>{ // Show 5 most recent
     const start = new Date(s.start_ts*1000); 
-    // Show 'Running' status if end_ts is 0
     const endTxt = s.end_ts ? (' — '+new Date(s.end_ts*1000).toLocaleString()) : ' — <b class="text-green-400">Running</b>';
-    // If running, show 'In Progress' for duration
-    const dur = s.end_ts ? s.duration : '<b class="text-green-400">In Progress</b>';
+    const dur = s.end_ts ? s.duration : '-';
     
-    // Create a container div instead of an 'a' tag
     const node = document.createElement('div');
-    node.id = `session-card-${s.id}`; // Add an ID so we can remove it
+    node.id = `session-card-${s.id}`;
     node.className = 'flex justify-between items-center p-3 rounded bg-gray-900 border border-gray-800 hover:border-cyan-500 transition-colors group';
     
-    // Create a clickable link for the main content
     const link = document.createElement('a');
     link.href = `/session/${s.id}/summary`;
     link.className = 'flex-grow';
@@ -124,7 +113,6 @@ async function refreshSessions(){
       + '<div class="muted text-sm">' + escapeHtml(s.tags || 'No tags') + ' · '
       + start.toLocaleString() + endTxt + ' · ' + dur + '</div>';
     
-    // Create the delete button
     const deleteBtn = document.createElement('button');
     deleteBtn.className = 'px-2 py-1 rounded bg-red-800 hover:bg-red-700 text-red-200 opacity-0 group-hover:opacity-100 transition-opacity ml-4';
     deleteBtn.innerHTML = '<i data-feather="trash-2" class="w-4 h-4"></i>';
@@ -133,10 +121,9 @@ async function refreshSessions(){
     node.appendChild(link);
     node.appendChild(deleteBtn);
     el.appendChild(node);
-    
-    // We must re-run feather.replace() after adding new icons
-    feather.replace(); 
   }); 
+  
+  feather.replace();
 }
 
 let statusInterval = null;
@@ -183,30 +170,50 @@ async function refreshStatus() {
   }
 }
 
-// --- NEW: Function to load chart ---
-async function loadAnalyticsChart() {
+// THIS IS THE WORKING FUNCTION THAT USES /api/dashboard_stats
+async function loadDashboardStats() {
   try {
-    const res = await fetch('/api/analytics/weekly_summary');
+    // 1. Call our new, simple API endpoint
+    const res = await fetch('/api/dashboard_stats'); 
     const data = await res.json();
     
-    if (!data.success) { throw new Error('Failed to load chart data'); }
+    if (!data.success) { 
+      throw new Error('Failed to load dashboard stats'); 
+    }
+
+    // 2. Populate "Today's Focus" Card
+    if (data.todays_focus_str) {
+      document.getElementById('stats-today').textContent = data.todays_focus_str;
+      document.getElementById('stats-today-placeholder').style.display = 'none';
+    } else {
+      document.getElementById('stats-today').textContent = "0h 00m 00s";
+    }
+    
+    // 3. Check for 'daily_trend' data for the chart
+    if (!data.daily_trend || !data.daily_trend.data) { 
+      throw new Error('Failed to load chart data (missing daily_trend)');
+    }
+    
+    // 4. Get the correct labels and data
+    const labels = data.daily_trend.labels;
+    const chartData = data.daily_trend.data;
 
     const ctx = document.getElementById('weeklyChart').getContext('2d');
     
-    // Create gradient
+    // 5. Draw the chart
     const gradient = ctx.createLinearGradient(0, 0, 0, 300);
-    gradient.addColorStop(0, 'rgba(56, 189, 248, 0.5)'); // cyan-400 with 50% opacity
-    gradient.addColorStop(1, 'rgba(56, 189, 248, 0)');   // transparent
+    gradient.addColorStop(0, 'rgba(56, 189, 248, 0.5)');
+    gradient.addColorStop(1, 'rgba(56, 189, 248, 0)');
 
     new Chart(ctx, {
       type: 'line',
       data: {
-        labels: data.labels,
+        labels: labels,
         datasets: [{
           label: 'Focus Hours',
-          data: data.data,
+          data: chartData,
           backgroundColor: gradient,
-          borderColor: '#38bdf8', // cyan-400
+          borderColor: '#38bdf8',
           borderWidth: 2,
           pointBackgroundColor: '#fff',
           pointBorderColor: '#38bdf8',
@@ -220,39 +227,20 @@ async function loadAnalyticsChart() {
         responsive: true,
         maintainAspectRatio: false,
         scales: {
-          y: {
-            beginAtZero: true,
-            grid: {
-              color: '#374151' // gray-700
-            },
-            ticks: {
-              color: '#9ca3af' // gray-400
-            }
-          },
-          x: {
-            grid: {
-              display: false
-            },
-            ticks: {
-              color: '#9ca3af' // gray-400
-            }
-          }
+          y: { beginAtZero: true, grid: { color: '#374151' }, ticks: { color: '#9ca3af' } },
+          x: { grid: { display: false }, ticks: { color: '#9ca3af' } }
         },
         plugins: {
-          legend: {
-            display: false
-          },
+          legend: { display: false },
           tooltip: {
-            backgroundColor: '#1f2937', // gray-800
+            backgroundColor: '#1f2937',
             titleFont: { size: 14 },
             bodyFont: { size: 12 },
             padding: 10,
             caretSize: 6,
             cornerRadius: 6,
             callbacks: {
-              label: function(context) {
-                return ` ${context.parsed.y} hours`;
-              }
+              label: function(context) { return ` ${context.parsed.y} hours`; }
             }
           }
         }
@@ -260,17 +248,15 @@ async function loadAnalyticsChart() {
     });
 
   } catch (err) {
-    console.error(err);
+    console.error("Error in loadDashboardStats:", err);
     document.getElementById('weeklyChart').parentElement.innerHTML = '<div class="text-red-400">Error: Could not load chart.</div>';
   }
 }
 
-
-// --- Load all data on page start ---
+// --- 3. RUN ALL FUNCTIONS ---
 refreshSessions();
 refreshStatus();
-loadAnalyticsChart();
-
+loadDashboardStats(); 
 </script>
 
 {% endblock %}

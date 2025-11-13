@@ -118,7 +118,7 @@ def runserver():
         from webapp.routes import create_app
         app = create_app()
         # FORCE DEBUG MODE
-        app.run(host='127.0.0.1', port=PORT, threaded=True, debug=True)
+        app.run(host='127.0.0.1', port=PORT, threaded=True, debug=True, use_reloader=False)
     except ImportError as e:
         print(f"Error: Failed to import webapp. {e}")
         print("Please ensure your venv is active and all files are saved.")

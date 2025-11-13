@@ -2,6 +2,154 @@
 {% block content %}
   <script> document.page_id = 'history'; </script>
   
-  <h1 class="text-3xl font-semibold">Session History</h1>
-  <p class="muted">This page will soon contain a searchable list of all your past sessions.</p>
+  <h1 class="text-3xl font-semibold mb-6">Session History</h1>
+
+  <div class="card p-6 rounded-lg shadow-sm mb-6">
+    <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+      <div>
+        <label for="search-name" class="block text-sm mb-1 muted">Search by name</label>
+        <input type="text" id="search-name" class="w-full p-2 rounded bg-gray-900 border border-gray-700" placeholder="E.g. Math practice">
+      </div>
+      <div>
+        <label for="search-tag" class="block text-sm mb-1 muted">Search by tag</label>
+        <input type="text" id="search-tag" list="tags-datalist" class="w-full p-2 rounded bg-gray-900 border border-gray-700" placeholder="E.g. study">
+        <datalist id="tags-datalist"></datalist>
+      </div>
+      <div class="muted text-sm md:mt-7">
+        Found <b id="session-count">0</b> session(s).
+      </div>
+    </div>
+  </div>
+
+  <div class="card p-6 rounded-lg shadow-sm">
+    <div id="history-list" class="space-y-3 muted">
+      Loading...
+    </div>
+  </div>
+
+<script>
+  const nameInput = document.getElementById('search-name');
+  const tagInput = document.getElementById('search-tag');
+  const listEl = document.getElementById('history-list');
+  const countEl = document.getElementById('session-count');
+
+  function escapeHtml(unsafe){ 
+    return unsafe.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#039;'); 
+  }
+  
+  // This function fetches the data from the new API
+  async function refreshHistory() {
+    const name = nameInput.value.trim();
+    const tag = tagInput.value.trim();
+    
+    // Build the query URL
+    const url = `/api/all_sessions?name=${encodeURIComponent(name)}&tag=${encodeURIComponent(tag)}`;
+    
+    try {
+      const res = await fetch(url);
+      if (!res.ok) {
+        listEl.innerHTML = '<div class="text-red-400">Error: Could not load sessions.</div>';
+        return;
+      }
+      
+      const data = await res.json();
+      if (!data.success) {
+        listEl.innerHTML = `<div class="text-red-400">${data.error}</div>`;
+        return;
+      }
+      
+      countEl.textContent = data.sessions.length;
+      
+      if (data.sessions.length === 0) {
+        listEl.innerHTML = '<div class="muted">No sessions found matching your search.</div>';
+        return;
+      }
+      
+      listEl.innerHTML = ''; // Clear loading
+      
+      data.sessions.forEach(s => {
+        const start = new Date(s.start_ts * 1000);
+        const endTxt = s.end_ts ? (' — ' + new Date(s.end_ts * 1000).toLocaleString()) : ' — <b class="text-green-400">Running</b>';
+        const dur = s.end_ts ? s.duration : '-';
+        
+        // We use the same card style from the dashboard
+        const node = document.createElement('div');
+        node.id = `session-card-${s.id}`; // Add ID for delete button
+        node.className = 'flex justify-between items-center p-3 rounded bg-gray-900 border border-gray-700 hover:border-cyan-500 transition-colors group';
+        
+        const link = document.createElement('a');
+        link.href = `/session/${s.id}/summary`;
+        link.className = 'flex-grow';
+        link.innerHTML = '<div class="font-medium">' + escapeHtml(s.name) + '</div>'
+          + '<div class="muted text-sm">' + escapeHtml(s.tags || 'No tags') + ' · '
+          + start.toLocaleString() + endTxt + ' · ' + dur + '</div>';
+        
+        // Add the delete button
+        const deleteBtn = document.createElement('button');
+        deleteBtn.className = 'px-2 py-1 rounded bg-red-800 hover:bg-red-700 text-red-200 opacity-0 group-hover:opacity-100 transition-opacity ml-4';
+        deleteBtn.innerHTML = '<i data-feather="trash-2" class="w-4 h-4"></i>';
+        deleteBtn.onclick = (e) => deleteSession(s.id, e);
+        
+        node.appendChild(link);
+        node.appendChild(deleteBtn);
+        listEl.appendChild(node);
+      });
+      
+      feather.replace(); // Render new delete icons
+      
+    } catch (err) {
+      listEl.innerHTML = '<div class="text-red-400">A network error occurred.</div>';
+    }
+  }
+  
+  // This is the delete function from the dashboard
+  async function deleteSession(sessionId, event) {
+    event.stopPropagation();
+    event.preventDefault();
+    if (!confirm('Are you sure you want to permanently delete this session?')) {
+      return;
+    }
+    const res = await fetch('/api/session/delete', {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({session_id: sessionId})
+    });
+    const data = await res.json();
+    if (data.success) {
+      document.getElementById(`session-card-${sessionId}`).remove();
+      countEl.textContent = parseInt(countEl.textContent) - 1;
+    } else {
+      alert('Failed to delete session: ' + data.error);
+    }
+  }
+  
+  // This function loads the tags for the dropdown
+  async function loadTags() {
+    try {
+      const res = await fetch('/api/tags');
+      const data = await res.json();
+      if (data.success && data.tags.length > 0) {
+        const datalist = document.getElementById('tags-datalist');
+        datalist.innerHTML = '';
+        data.tags.forEach(tag => {
+          if (tag) {
+            const option = document.createElement('option');
+            option.value = tag;
+            datalist.appendChild(option);
+          }
+        });
+      }
+    } catch (err) { console.error("Could not load tags:", err); }
+  }
+  
+  // --- Event Listeners ---
+  // We use "keyup" to make it search as you type
+  nameInput.addEventListener('keyup', refreshHistory);
+  tagInput.addEventListener('keyup', refreshHistory);
+  
+  // --- Load initial data ---
+  refreshHistory();
+  loadTags();
+  
+</script>
 {% endblock %}

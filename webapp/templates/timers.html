@@ -19,22 +19,26 @@
     </div>
 
     <div id="panel-stopwatch" class="timer-panel">
-      {% include 'parts/stopwatch.html' ignore missing %} <p class="muted mb-6">Start a new session and track your activity. Pauses do not count toward your focus time.</p>
+      <p class="muted mb-6">Start a new session and track your activity. Pauses do not count toward your focus time.</p>
+      
       <form id="sessionForm" onsubmit="return false;">
         <div class="mb-4">
           <label class="block text-sm mb-1">Session name</label>
           <input id="sessionName" class="w-full p-2 rounded bg-gray-900 border border-gray-700" placeholder="E.g. Math practice" />
         </div>
+
         <div class="mb-4">
           <label class="block text-sm mb-1">Tags (comma separated)</label>
           <input id="tags" list="tags-datalist" class="w-full p-2 rounded bg-gray-900 border border-gray-700" placeholder="Type or select tags..." />
           <datalist id="tags-datalist"></datalist>
         </div>
+
         <div class="flex items-center space-x-3">
           <button id="startBtn" class="px-4 py-2 rounded bg-green-600 hover:bg-green-500 font-medium" onclick="startSession()">Start</button>
           <button id="pauseBtn" class="px-4 py-2 rounded bg-yellow-600 hover:bg-yellow-500 font-medium hidden" onclick="pauseSession()">Pause</button>
           <button id="resumeBtn" class="px-4 py-2 rounded bg-green-600 hover:bg-green-500 font-medium hidden" onclick="resumeSession()">Resume</button>
           <button id="stopBtn" class="px-4 py-2 rounded bg-red-600 hover:bg-red-500 font-medium hidden" onclick="stopSession()">Stop</button>
+          
           <div id="timer" class="ml-4 font-mono text-lg">0h 00m 00s</div>
         </div>
         <p class="muted mt-3 text-sm">Tip: Activity tracking will begin when you press Start.</p>
@@ -42,7 +46,37 @@
     </div>
 
     <div id="panel-timer" class="timer-panel hidden">
-      <p class="muted mt-3 text-sm">Feature coming soon.</p>
+      <p class="muted mb-6">Set a duration and receive a notification when time is up. This will create a single, uninterrupted session log.</p>
+      
+      <div class="max-w-md mx-auto">
+        <div class="mb-4">
+          <label class="block text-sm mb-1">Session name</label>
+          <input id="timer-sessionName" class="w-full p-2 rounded bg-gray-900 border border-gray-700" placeholder="E.g. Read chapter 5" />
+        </div>
+        <div class="mb-4">
+          <label class="block text-sm mb-1">Tags (comma separated)</label>
+          <input id="timer-tags" list="tags-datalist" class="w-full p-2 rounded bg-gray-900 border border-gray-700" placeholder="Type or select tags..." />
+        </div>
+
+        <div class="mb-6">
+          <label class="block text-sm mb-1">Duration (minutes)</label>
+          <input type="number" id="timer-minutes-input" value="30" class="w-24 p-2 rounded bg-gray-900 border border-gray-700 text-center">
+        </div>
+
+        <div id="timer-display" class="text-center mb-6 hidden">
+          <div id="timer-countdown" class="text-8xl font-bold font-mono my-4">30:00</div>
+          <div id="timer-status" class="text-2xl font-semibold text-cyan-400">Timer is running...</div>
+        </div>
+
+        <div class="flex justify-center items-center space-x-3">
+          <button id="timer-start" class="px-6 py-3 rounded-lg bg-cyan-600 hover:bg-cyan-500 font-medium text-lg w-32" onclick="simpleTimer.startSession()">
+            Start
+          </button>
+          <button id="timer-stop" class="px-6 py-3 rounded-lg bg-red-600 hover:bg-red-500 font-medium text-lg w-32 hidden" onclick="simpleTimer.stopSession()">
+            Stop
+          </button>
+        </div>
+      </div>
     </div>
 
     <div id="panel-pomodoro" class="timer-panel hidden">
@@ -55,8 +89,8 @@
         </div>
         <div class="mb-4">
           <label class="block text-sm mb-1">Tags (comma separated)</label>
-          <input id="pomo-tags" list="tags-datalist" class="w-full p-2 rounded bg-gray-900 border border-gray-700" placeholder="Type or select tags..." />
-          </div>
+          <input id="pomo-tags" list="tags-datalist" class="w-full p-2 rounded bg-gray-900 border border-gray-700" placeholder="coding,pomodoro" />
+        </div>
       </div>
 
       <div class="text-center mb-6">
@@ -69,15 +103,14 @@
         <button id="pomo-start-pause" class="px-6 py-3 rounded-lg bg-cyan-600 hover:bg-cyan-500 font-medium text-lg w-32" onclick="pomo.startPause()">
           Start
         </button>
-        
         <button id="pomo-stop" class="px-4 py-2 rounded-lg bg-red-600 hover:bg-red-500 font-medium hidden" onclick="pomo.stopSession()">
           <i data-feather="stop-circle" class="w-5 h-5"></i>
         </button>
-        
         <button id="pomo-reset" class="px-4 py-2 rounded-lg bg-gray-700 hover:bg-gray-600 font-medium" onclick="pomo.resetUI()">
           <i data-feather="rotate-cw" class="w-5 h-5"></i>
         </button>
       </div>
+
       <div class="max-w-lg mx-auto border-t border-gray-700 pt-6">
         <h3 class="font-medium text-center mb-4">Settings</h3>
         <div class="flex items-center justify-center space-x-4">
@@ -100,37 +133,47 @@
         </div>
       </div>
     </div>
+
   </div>
   
   <audio id="alarm-sound" src="/static/alarm.mp3" preload="auto"></audio>
 
   <style>
-    /* (timer-tab styles unchanged) */
-    .timer-tab { border-bottom: 3px solid transparent; margin-bottom: -2px; }
-    .timer-tab.active { color: #38bdf8; border-bottom-color: #38bdf8; }
-    .timer-tab:not(.active):hover { color: #cbd5e1; }
+    /* Add styles for the new tabs */
+    .timer-tab {
+      border-bottom: 3px solid transparent;
+      margin-bottom: -2px; /* Overlap the border */
+    }
+    .timer-tab.active {
+      color: #38bdf8; /* cyan-400 */
+      border-bottom-color: #38bdf8;
+    }
+    .timer-tab:not(.active):hover {
+      color: #cbd5e1; /* gray-300 */
+    }
   </style>
 
   <script>
-    // (Tab switching and Stopwatch JS is unchanged)
-    // ...
-    // === TAB SWITCHING LOGIC (Unchanged) ===
+    // === TAB SWITCHING LOGIC ===
     const tabs = ['stopwatch', 'timer', 'pomodoro'];
     function switchTab(tabName) {
       tabs.forEach(tab => {
+        // Toggle button visual
         const tabButton = document.getElementById(`tab-${tab}`);
         tabButton.classList.toggle('active', tab === tabName);
         tabButton.classList.toggle('muted', tab !== tabName);
         
+        // Toggle content panel
         const panel = document.getElementById(`panel-${tab}`);
         panel.classList.toggle('hidden', tab !== tabName);
       });
-      if (tabName === 'pomodoro') {
+      // Re-render icons if we switched to pomodoro or timer
+      if (tabName === 'pomodoro' || tabName === 'timer') {
         feather.replace();
       }
     }
 
-    // === STOPWATCH JAVASCRIPT (Unchanged) ===
+    // === STOPWATCH JAVASCRIPT ===
     let runningSession = null;
     let timerInterval = null;
     const DOMElements = {
@@ -142,7 +185,13 @@
         sessionName: document.getElementById('sessionName'),
         tags: document.getElementById('tags')
     };
-    function secToHHMMSS(s){ let h = Math.floor(s/3600); s %= 3600; let m = Math.floor(s/60); let sec = s%60; return `${h}h ${String(m).padStart(2,'0')}m ${String(sec).padStart(2,'0')}s`; }
+
+    function secToHHMMSS(s){
+      let h = Math.floor(s/3600); s %= 3600;
+      let m = Math.floor(s/60); let sec = s%60;
+      return `${h}h ${String(m).padStart(2,'0')}m ${String(sec).padStart(2,'0')}s`;
+    }
+
     function setUIState(state) {
         DOMElements.startBtn.classList.toggle('hidden', state !== 'stopped');
         DOMElements.pauseBtn.classList.toggle('hidden', state !== 'running');
@@ -151,12 +200,15 @@
         DOMElements.sessionName.disabled = (state !== 'stopped');
         DOMElements.tags.disabled = (state !== 'stopped');
     }
+
     async function startSession(){
       const name = DOMElements.sessionName.value.trim();
       const tags = DOMElements.tags.value.trim();
       if (!name){ alert('Please enter a session name.'); return; }
-      const res = await fetch('/api/start', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({name, tags}) });
+      
+      const res = await fetch('/api/start', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({name, tags, duration: 0}) });
       const data = await res.json();
+      
       if (data.success){ 
         runningSession = data.session; 
         setUIState('running');
@@ -165,6 +217,7 @@
         alert('Failed to start session'); 
       }
     }
+
     async function pauseSession() {
         if (!runningSession) return;
         stopTimerClient(); 
@@ -177,6 +230,7 @@
             startTimerClient(); 
         }
     }
+
     async function resumeSession() {
         if (!runningSession) return;
         const res = await fetch('/api/resume', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({session_id: runningSession.id}) });
@@ -188,11 +242,16 @@
             alert('Failed to resume session.');
         }
     }
+
     async function stopSession(){
       if (!runningSession) return;
-      if (!confirm('Are you sure you want to end this session?')) { return; }
+      if (!confirm('Are you sure you want to end this session?')) {
+        return;
+      }
+      
       const res = await fetch('/api/stop', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({session_id: runningSession.id}) });
       const data = await res.json();
+      
       if (data.success){ 
         runningSession=null; 
         stopTimerClient();
@@ -203,71 +262,137 @@
         alert('Failed to stop session'); 
       }
     }
+
     function startTimerClient(){ 
         stopTimerClient(); 
         timerInterval = setInterval(async ()=>{ 
             const res = await fetch('/api/status'); 
             const data = await res.json(); 
-            if (data.running){
+            if (data.running && !data.is_countdown){
                 DOMElements.timer.innerText = data.elapsed_str;
-                if (data.status === 'running') { setUIState('running'); } 
-                else if (data.status === 'paused') { setUIState('paused'); stopTimerClient(); }
-            } else {
+                if (data.status === 'running') {
+                    setUIState('running');
+                } else if (data.status === 'paused') {
+                    setUIState('paused');
+                    stopTimerClient(); 
+                }
+            } else if (!data.running) {
                 DOMElements.timer.innerText = '0h 00m 00s';
                 setUIState('stopped');
                 stopTimerClient();
             } 
         }, 1000); 
     }
-    function stopTimerClient(){ if (timerInterval) clearInterval(timerInterval); timerInterval=null; }
-    function escapeHtml(unsafe){ return unsafe.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#039;'); }
+
+    function stopTimerClient(){ 
+      if (timerInterval) clearInterval(timerInterval); 
+      timerInterval=null; 
+    }
+
+    function escapeHtml(unsafe){ 
+      return unsafe.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#039;'); 
+    }
+
+    // --- === THIS IS THE INIT FUNCTION === ---
     async function init(){ 
+      // 1. Set the default state for ALL timer UIs first.
+      setUIState('stopped');
+      DOMElements.timer.innerText = '0h 00m 00s';
+      pomo.resetUI();
+      simpleTimer.resetUI();
+      
+      // 2. Check the server for a running session.
       const res = await fetch('/api/status'); 
       const data = await res.json(); 
-      if (data.running){ 
-        runningSession = data.session;
-        DOMElements.timer.innerText = data.elapsed_str;
-        DOMElements.sessionName.value = data.session.name;
-        DOMElements.tags.value = data.session.tags;
-        if (data.status === 'paused') {
-            setUIState('paused');
-        } else {
-            setUIState('running');
-            await resumeSession();
-        }
-        if (data.running && data.session.tags.includes('pomodoro')) {
-          switchTab('pomodoro');
-          // We will add full sync logic later
-        } 
-      } else { 
-        setUIState('stopped');
-        DOMElements.timer.innerText = '0h 00m 00s';
-      } 
-    }
-    init();
+      
+      // 3. If a session is running, decide which tab to show and sync.
+      if (data.running){
+        const sessionTags = data.session.tags || '';
+        
+        // 3a. Check if it's a countdown
+        if (data.is_countdown) {
+          const isPomo = sessionTags.includes('pomodoro');
+          
+          if (isPomo) {
+            // --- SYNC POMODORO ---
+            switchTab('pomodoro');
+            pomo.runningSessionId = data.session.id;
+            pomo.ui.sessionName.value = data.session.name;
+            pomo.ui.tags.value = data.session.tags;
+            pomo.setInputsDisabled(true);
+            
+            pomo.start(); // Show Stop button, set running=true
+            if (data.status === 'paused') {
+                pomo.pause(); // Show Start button, set running=false
+            }
+            // Sync time left
+            pomo.timeLeft = data.session.target_duration - data.elapsed;
+            pomo.updateTimerDisplay();
+            pomo.ui.status.textContent = (data.status === 'paused') ? "Session is paused." : "Session is running...";
 
-    // === POMODORO TIMER LOGIC (WITH FIXED BUTTONS) ===
+          } else {
+            // --- SYNC SIMPLE TIMER ---
+            switchTab('timer');
+            simpleTimer.runningSessionId = data.session.id;
+            simpleTimer.ui.sessionName.value = data.session.name;
+            simpleTimer.ui.tags.value = data.session.tags;
+            simpleTimer.setInputsDisabled(true);
+            
+            // Sync time left
+            simpleTimer.timeLeft = data.session.target_duration - data.elapsed;
+            simpleTimer.start(); // Show Stop button, set running=true, start interval
+            
+            if (data.status === 'paused') {
+                simpleTimer.pause(); // Stop interval
+                simpleTimer.ui.status.textContent = "Timer is paused.";
+            } else {
+                simpleTimer.ui.status.textContent = "Timer is running...";
+            }
+          }
+
+        } else {
+          // 4. It's a normal Stopwatch
+          switchTab('stopwatch');
+          runningSession = data.session;
+          DOMElements.timer.innerText = data.elapsed_str;
+          DOMElements.sessionName.value = data.session.name;
+          DOMElements.tags.value = data.session.tags;
+          
+          if (data.status === 'paused') {
+              setUIState('paused');
+          } else {
+              setUIState('running');
+              await resumeSession(); // Only resume the stopwatch
+          }
+        }
+      } 
+      // If no session is running, we're done.
+    }
+    
+    // --- === POMODORO TIMER LOGIC === ---
     const pomo = {
-      // (State and Config properties are unchanged)
+      // --- State ---
       timerId: null,
-      state: 'focus',
+      state: 'focus', 
       running: false,
       timeLeft: 1500,
       cycles: 0,
-      runningSessionId: null,
+      runningSessionId: null, 
+      
+      // --- Configs ---
       get focusTime() { return parseInt(document.getElementById('pomo-focus-input').value) * 60 || 1500; },
       get shortBreakTime() { return parseInt(document.getElementById('pomo-short-break-input').value) * 60 || 300; },
       get longBreakTime() { return parseInt(document.getElementById('pomo-long-break-input').value) * 60 || 900; },
       get cyclesForLongBreak() { return parseInt(document.getElementById('pomo-cycles-input').value) || 4; },
 
-      // --- UI Elements (Updated) ---
+      // --- UI Elements ---
       ui: {
         timer: document.getElementById('pomo-timer'),
         status: document.getElementById('pomo-status'),
         cycles: document.getElementById('pomo-cycles'),
         startPauseBtn: document.getElementById('pomo-start-pause'),
-        stopBtn: document.getElementById('pomo-stop'),     // NEW
-        resetBtn: document.getElementById('pomo-reset'),   // NEW
+        stopBtn: document.getElementById('pomo-stop'),
+        resetBtn: document.getElementById('pomo-reset'),
         sessionName: document.getElementById('pomo-sessionName'),
         tags: document.getElementById('pomo-tags'),
         inputs: [
@@ -279,57 +404,76 @@
         alarm: document.getElementById('alarm-sound')
       },
       
-      // (startPause, startSession, pauseSession, resumeSession are unchanged)
+      // --- Core Methods ---
       async startPause() {
         if (!this.runningSessionId) {
           const success = await this.startSession();
           if (!success) return; 
         } 
         else if (this.running) {
-          this.pauseSession();
+          this.pauseSession(); 
         } 
         else {
-          this.resumeSession();
+          this.resumeSession(); 
         }
       },
+
+      // --- Backend Session Methods ---
       async startSession() {
         const name = this.ui.sessionName.value.trim();
         let tags = this.ui.tags.value.trim();
         if (!name) { alert('Please enter a session name.'); return false; }
-        if (!tags.includes('pomodoro')) { tags = tags ? `pomodoro,${tags}` : 'pomodoro'; }
         
-        const res = await fetch('/api/start', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({name, tags}) });
+        if (!tags.includes('pomodoro')) {
+          tags = tags ? `pomodoro,${tags}` : 'pomodoro';
+        }
+        
+        // --- SEND DURATION ---
+        this.timeLeft = this.focusTime; // Set time left
+        const res = await fetch('/api/start', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({name, tags, duration: this.timeLeft}) });
         const data = await res.json();
         
         if (data.success){ 
           this.runningSessionId = data.session.id; 
-          this.ui.sessionName.value = name;
+          this.ui.sessionName.value = name; 
           this.ui.tags.value = tags;
-          this.setInputsDisabled(true);
-          this.start(); // Start the frontend timer
+          this.setInputsDisabled(true); 
+          
+          this.start();
+          
+          if (Notification.permission === 'default') {
+            Notification.requestPermission();
+          }
           return true;
         } else { 
           alert('Failed to start session'); 
           return false;
         }
       },
+      
       async pauseSession() {
         if (!this.runningSessionId) return;
-        this.pause();
+        this.pause(); 
         await fetch('/api/pause', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({session_id: this.runningSessionId}) });
       },
+
       async resumeSession() {
         if (!this.runningSessionId) return;
-        this.start();
+        this.start(); 
         await fetch('/api/resume', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({session_id: this.runningSessionId}) });
       },
       
-      // (stopSession is unchanged)
       async stopSession() {
-        if (!this.runningSessionId) return;
-        if (!confirm('Are you sure you want to end this Pomodoro session?')) { return; }
+        if (!this.runningSessionId) {
+            this.resetUI(); // Allow reset even if not running
+            return;
+        }
         
-        this.pause();
+        if (!confirm('Are you sure you want to end this Pomodoro session?')) {
+          return;
+        }
+        
+        this.pause(); 
         const res = await fetch('/api/stop', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({session_id: this.runningSessionId}) });
         const data = await res.json();
         
@@ -341,40 +485,38 @@
         }
       },
 
-      // --- Frontend Timer Methods (Updated) ---
+      // --- Frontend Timer Methods ---
       start() {
         this.running = true;
         this.ui.startPauseBtn.textContent = 'Pause';
-        this.ui.stopBtn.classList.remove('hidden');   // Show Stop button
-        this.ui.resetBtn.classList.add('hidden');    // Hide Reset button
+        this.ui.stopBtn.classList.remove('hidden');   
+        this.ui.resetBtn.classList.add('hidden');    
         this.timerId = setInterval(() => this.tick(), 1000);
       },
 
       pause() {
         this.running = false;
         this.ui.startPauseBtn.textContent = 'Start';
-        // Stop and Reset buttons remain as they are
         clearInterval(this.timerId);
         this.timerId = null;
       },
 
-      // (tick and nextState are unchanged)
       tick() {
         if (this.timeLeft <= 0) {
-          this.pause();
+          this.pause(); 
           this.nextState();
           return;
         }
         this.timeLeft--;
         this.updateTimerDisplay();
       },
+
       async nextState() {
         this.playAlarm();
         
         if (this.state === 'focus') {
-          // === FOCUS JUST ENDED ===
           this.cycles++;
-          await this.pauseSession(); // Pause the backend tracker for the break
+          await this.pauseSession(); 
           
           if (this.cycles >= this.cyclesForLongBreak) {
             this.setState('longBreak');
@@ -383,51 +525,62 @@
             this.setState('shortBreak');
             this.showNotification('Time for a short break!', `Cycle ${this.cycles} complete.`);
           }
-          this.start(); // Auto-start the break timer
+          
+          this.timeLeft = (this.state === 'longBreak') ? this.longBreakTime : this.shortBreakTime;
+          this.start(); 
           
         } else {
-          // === BREAK JUST ENDED ===
           
-          // CHECK: Have we completed the target number of cycles?
           if (this.cycles >= this.cyclesForLongBreak) {
             this.showNotification('Pomodoro Complete!', 'Session will now be stopped.');
-            // Use a short delay so the user can hear the alarm
             setTimeout(() => {
-              this.stopSession(); // This stops the session and resets the UI
+              this.stopSession(); 
             }, 1000); 
-            // DO NOT start the next timer
           } else {
-            // If not done, go back to focus
             this.setState('focus');
-            await this.resumeSession(); // Resume backend tracker
+            await this.resumeSession(); 
             this.showNotification('Break is over!', 'Time to get back to focus.');
-            this.start(); // Auto-start the next focus timer
+            
+            this.timeLeft = this.focusTime;
+            this.start(); 
           }
         }
       },
       
-      // --- resetUI (Now called by Reset button) ---
       resetUI() {
         this.pause();
         this.runningSessionId = null;
         this.cycles = 0;
-        this.setState('focus');
-        this.setInputsDisabled(false);
-        this.ui.sessionName.value = '';
+        this.setState('focus'); 
+        this.setInputsDisabled(false); 
+        this.ui.sessionName.value = ''; 
         this.ui.tags.value = '';
-        this.ui.stopBtn.classList.add('hidden');     // Hide Stop button
-        this.ui.resetBtn.classList.remove('hidden');   // Show Reset button
+        this.ui.stopBtn.classList.add('hidden');     
+        this.ui.resetBtn.classList.remove('hidden');   
       },
 
-      // (Helper Methods are unchanged)
+      // --- Helper Methods ---
       setState(newState) {
         this.state = newState;
-        if (newState === 'focus') { this.timeLeft = this.focusTime; this.ui.status.textContent = 'Time to Focus!'; } 
-        else if (newState === 'shortBreak') { this.timeLeft = this.shortBreakTime; this.ui.status.textContent = 'Time for a Short Break!'; } 
-        else if (newState === 'longBreak') { this.timeLeft = this.longBreakTime; this.ui.status.textContent = 'Time for a Long Break!'; }
+        
+        if (newState === 'focus') {
+          this.ui.status.textContent = 'Time to Focus!';
+        } else if (newState === 'shortBreak') {
+          this.ui.status.textContent = 'Time for a Short Break!';
+        } else if (newState === 'longBreak') {
+          this.ui.status.textContent = 'Time for a Long Break!';
+        }
+        
+        // Update timeLeft only if timer is not running
+        if(!this.running) {
+            if(this.state == 'focus') this.timeLeft = this.focusTime;
+            if(this.state == 'shortBreak') this.timeLeft = this.shortBreakTime;
+            if(this.state == 'longBreak') this.timeLeft = this.longBreakTime;
+        }
         this.updateTimerDisplay();
         this.updateCyclesDisplay();
       },
+
       updateTimerDisplay() {
         const minutes = Math.floor(this.timeLeft / 60);
         const seconds = this.timeLeft % 60;
@@ -435,38 +588,218 @@
         this.ui.timer.textContent = display;
         document.title = `${display} - StudyTrack`;
       },
+
       updateCyclesDisplay() {
         this.ui.cycles.textContent = `Cycle: ${this.cycles} / ${this.cyclesForLongBreak}`;
       },
+      
       setInputsDisabled(disabled) {
         this.ui.inputs.forEach(input => input.disabled = disabled);
         this.ui.sessionName.disabled = disabled;
         this.ui.tags.disabled = disabled;
       },
-      playAlarm() { this.ui.alarm.currentTime = 0; this.ui.alarm.play().catch(e => console.warn("Could not play alarm:", e)); },
-      showNotification(title, body) { if (Notification.permission === 'granted') { new Notification(title, { body: body, icon: '/static/icon.png' }); } }
+      
+      playAlarm() {
+        this.ui.alarm.currentTime = 0;
+        this.ui.alarm.play().catch(e => console.warn("Could not play alarm:", e));
+      },
+      
+      showNotification(title, body) {
+        if (Notification.permission === 'granted') {
+          new Notification(title, {
+            body: body,
+            icon: '/static/icon.png'
+          });
+        }
+      }
     };
     
-    // --- 🐞 HERE IS THE FIX FOR THE "25:00" BUG ---
-    // This new listener correctly updates the timer when you change the settings.
+    // --- Initialize Pomodoro UI ---
     pomo.ui.inputs.forEach(input => {
       input.addEventListener('change', () => {
         if (!pomo.running) {
-          // 1. Re-run setState for the current state.
-          //    This will re-read the correct time value (e.g., this.focusTime)
-          //    and update the timer display.
-          pomo.setState(pomo.state); 
-          
-          // 2. And always update the cycles display, as it might have changed.
+          pomo.setState(pomo.state); // This will re-read the correct time
           pomo.updateCyclesDisplay();
         }
       });
     });
     
-    // Set the initial state on page load
-    pomo.setState('focus');
+    pomo.timeLeft = pomo.focusTime;
+    pomo.updateTimerDisplay();
+    pomo.updateCyclesDisplay();
 
-    // --- NEW: Function to load tags into the datalist ---
+
+    // === SIMPLE TIMER LOGIC ===
+    const simpleTimer = {
+      // --- State ---
+      timerId: null,
+      running: false,
+      timeLeft: 1800, 
+      runningSessionId: null,
+
+      // --- Config ---
+      get duration() { return parseInt(this.ui.minutesInput.value) * 60 || 1800; },
+
+      // --- UI Elements ---
+      ui: {
+        timer: document.getElementById('timer-countdown'),
+        status: document.getElementById('timer-status'),
+        display: document.getElementById('timer-display'),
+        startBtn: document.getElementById('timer-start'),
+        stopBtn: document.getElementById('timer-stop'),
+        sessionName: document.getElementById('timer-sessionName'),
+        tags: document.getElementById('timer-tags'),
+        minutesInput: document.getElementById('timer-minutes-input'),
+        alarm: document.getElementById('alarm-sound')
+      },
+      
+      // --- Core Methods ---
+      async startSession() {
+        const name = this.ui.sessionName.value.trim();
+        let tags = this.ui.tags.value.trim(); 
+        if (!name) { alert('Please enter a session name.'); return; }
+
+        if (!tags.includes('timer')) {
+          tags = tags ? `timer,${tags}` : 'timer';
+        }
+        
+        // --- SEND DURATION ---
+        this.timeLeft = this.duration; // Set time left
+        const res = await fetch('/api/start', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({name, tags, duration: this.timeLeft}) });
+        const data = await res.json();
+        
+        if (data.success) { 
+          this.runningSessionId = data.session.id; 
+          this.setInputsDisabled(true);
+          this.start();
+          
+          this.ui.tags.value = tags; 
+          
+          if (Notification.permission === 'default') {
+            Notification.requestPermission();
+          }
+        } else { 
+          alert('Failed to start session'); 
+        }
+      },
+
+      async stopSession() {
+        if (!this.runningSessionId) {
+          this.resetUI();
+          return;
+        }
+        
+        if (!confirm('Are you sure you want to stop this timer early?')) {
+          return;
+        }
+        
+        this.pause(); 
+        const res = await fetch('/api/stop', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({session_id: this.runningSessionId}) });
+        const data = await res.json();
+        
+        if (data.success) { 
+          this.resetUI();
+          window.location.href = `/session/${data.session_id}/summary`;
+        } else { 
+          alert('Failed to stop session.'); 
+        }
+      },
+
+      // --- Frontend Timer Methods ---
+      start() {
+        this.running = true;
+        this.ui.startBtn.classList.add('hidden');
+        this.ui.stopBtn.classList.remove('hidden');
+        this.ui.display.classList.remove('hidden');
+        
+        this.updateTimerDisplay(); 
+        this.timerId = setInterval(() => this.tick(), 1000);
+      },
+
+      pause() {
+        this.running = false;
+        clearInterval(this.timerId);
+        this.timerId = null;
+      },
+
+      tick() {
+        if (this.timeLeft <= 0) {
+          this.pause();
+          this.finishSession();
+          return;
+        }
+        this.timeLeft--;
+        this.updateTimerDisplay();
+      },
+      
+      async finishSession() {
+        this.playAlarm();
+        this.showNotification('Timer Finished!', `Your session "${this.ui.sessionName.value}" is complete.`);
+        
+        const res = await fetch('/api/stop', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({session_id: this.runningSessionId}) });
+        const data = await res.json();
+        
+        this.resetUI();
+        if (data.success) {
+          window.location.href = `/session/${data.session_id}/summary`;
+        }
+      },
+
+      resetUI() {
+        this.pause();
+        this.runningSessionId = null;
+        this.setInputsDisabled(false);
+        this.ui.startBtn.classList.remove('hidden');
+        this.ui.stopBtn.classList.add('hidden');
+        this.ui.display.classList.add('hidden');
+        this.ui.sessionName.value = '';
+        this.ui.tags.value = '';
+        this.ui.minutesInput.value = '30';
+        this.timeLeft = 1800;
+        this.updateTimerDisplay(); // Reset display
+      },
+
+      // --- Helper Methods ---
+      updateTimerDisplay() {
+        const minutes = Math.floor(this.timeLeft / 60);
+        const seconds = this.timeLeft % 60;
+        const display = `${String(minutes).padStart(2, '0')}:${String(seconds).padStart(2, '0')}`;
+        this.ui.timer.textContent = display;
+        document.title = `${display} - StudyTrack`;
+      },
+      
+      setInputsDisabled(disabled) {
+        this.ui.sessionName.disabled = disabled;
+        this.ui.tags.disabled = disabled;
+        this.ui.minutesInput.disabled = disabled;
+      },
+      
+      playAlarm() {
+        this.ui.alarm.currentTime = 0;
+        this.ui.alarm.play().catch(e => console.warn("Could not play alarm:", e));
+      },
+      
+      showNotification(title, body) {
+        if (Notification.permission === 'granted') {
+          new Notification(title, {
+            body: body,
+            icon: '/static/icon.png'
+          });
+        }
+      }
+    };
+
+    // --- Initialize Simple Timer UI ---
+    simpleTimer.ui.minutesInput.addEventListener('change', () => {
+      if (!simpleTimer.running) {
+        simpleTimer.timeLeft = simpleTimer.duration;
+        simpleTimer.updateTimerDisplay(); // Update display on change
+      }
+    });
+    simpleTimer.timeLeft = simpleTimer.duration;
+    simpleTimer.updateTimerDisplay(); // Set initial display
+
+    // --- Function to load tags into the datalist ---
     async function loadTags() {
       try {
         const res = await fetch('/api/tags');
@@ -474,23 +807,30 @@
         
         if (data.success && data.tags.length > 0) {
           const datalist = document.getElementById('tags-datalist');
-          datalist.innerHTML = ''; // Clear old tags
-          
-          data.tags.forEach(tag => {
-            if (tag) { // Ensure tag is not empty
-              const option = document.createElement('option');
-              option.value = tag;
-              datalist.appendChild(option);
-            }
-          });
+          if (datalist) { // Check if datalist exists on this page
+            datalist.innerHTML = ''; // Clear old tags
+            
+            data.tags.forEach(tag => {
+              if (tag) { // Ensure tag is not empty
+                const option = document.createElement('option');
+                option.value = tag;
+                datalist.appendChild(option);
+              }
+            });
+          }
         }
       } catch (err) {
         console.error("Could not load tags:", err);
       }
     }
     
-    // Load the tags when the page first loads
+    // --- THIS IS THE FIX ---
+    // ALL init/setup logic is at the end.
+    
+    // Load tags
     loadTags();
+    // Run the main init function AFTER all objects are defined
+    init();
 
   </script>
 {% endblock %}

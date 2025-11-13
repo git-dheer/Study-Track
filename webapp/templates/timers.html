@@ -736,13 +736,17 @@
         this.playAlarm();
         this.showNotification('Timer Finished!', `Your session "${this.ui.sessionName.value}" is complete.`);
         
-        const res = await fetch('/api/stop', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({session_id: this.runningSessionId}) });
-        const data = await res.json();
-        
-        this.resetUI();
-        if (data.success) {
-          window.location.href = `/session/${data.session_id}/summary`;
-        }
+        // --- THIS IS THE FIX ---
+        // Wait 1 second before stopping and redirecting to let the alarm play.
+        setTimeout(async () => {
+          const res = await fetch('/api/stop', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({session_id: this.runningSessionId}) });
+          const data = await res.json();
+          
+          this.resetUI();
+          if (data.success) {
+            window.location.href = `/session/${data.session_id}/summary`;
+          }
+        }, 4000); // 1000ms = 1 second delay  (set to 4 sec delay so i can hear alarm sound)
       },
 
       resetUI() {
